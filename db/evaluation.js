@@ -99,7 +99,7 @@ const RULE_PROFILES = [
     label: 'Smochine uscate pentru consumatorul final',
     keywords: ['smochine uscate', 'smochine'],
     limit_afb1: 6.0, limit_afla_sum: 10.0, limit_ota: 8.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.3 și 1.2.2'
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.3 și 1.2.1.1'
   },
   {
     id: 'peanuts-oilseeds-final',

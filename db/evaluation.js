@@ -83,7 +83,7 @@ const RULE_PROFILES = [
     label: 'Fructe uscate pentru consumatorul final (exclusiv smochine)',
     keywords: ['fructe uscate', 'stafide', 'curmale uscate', 'prune uscate', 'caise uscate'],
     limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 2.0,
-    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    // OTA și punctul 1.2.x verificate de Hermes 17.10.2026; limitele de aflatoxine și punctul 1.1.x neverificate pe textul oficial [de verificat]
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.4 și 1.2.1.2'
   },
   {
@@ -91,7 +91,7 @@ const RULE_PROFILES = [
     label: 'Fructe uscate înainte de sortare / alt tratament fizic',
     keywords: ['fructe uscate sortare', 'fructe uscate tratament fizic'],
     limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 2.0,
-    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    // OTA și punctul 1.2.x verificate de Hermes 17.10.2026; limitele de aflatoxine și punctul 1.1.x neverificate pe textul oficial [de verificat]
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.3 și 1.2.1.2'
   },
   {
@@ -166,7 +166,7 @@ const RULE_PROFILES = [
     label: 'Capsicum spp. uscat (boia, paprika, ardei iute, chilli, cayenne)',
     keywords: ['boia', 'paprika', 'ardei iute', 'chilli', 'cayenne'],
     limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 20.0,
-    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    // OTA și punctul 1.2.x verificate de Hermes 17.10.2026; limitele de aflatoxine și punctul 1.1.x neverificate pe textul oficial [de verificat]
     // (limita OTA de 20 µg/kg pentru Capsicum este confirmata si de Reg. (UE) 2022/1370)
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.14 și 1.2.18'
   },
@@ -175,7 +175,7 @@ const RULE_PROFILES = [
     label: 'Mirodenii uscate',
     keywords: ['mirodenii', 'condimente', 'piper', 'ghimbir', 'nucșoară', 'nucsoara', 'curcuma', 'turmeric'],
     limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 15.0,
-    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    // OTA și punctul 1.2.x verificate de Hermes 17.10.2026; limitele de aflatoxine și punctul 1.1.x neverificate pe textul oficial [de verificat]
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.14 și 1.2.17'
   },
   {
@@ -216,9 +216,12 @@ function getRuleProfile(category = '', productName = '') {
   // Capsicum spp. are limita OTA proprie (mai mare decat restul mirodeniilor),
   // deci are prioritate fata de categoria generala "Mirodenii uscate", chiar
   // daca aceasta a fost aleasa explicit din lista. Nu suprascrie alte etichete exacte.
+  // Exceptie: un amestec de mirodenii (text cu "amestec", "mix", "mixtura") care
+  // contine Capsicum ramane la limita generala a mirodeniilor (spices-dried).
   const capsicum = RULE_PROFILES.find(r => r.id === 'capsicum-dried');
   if ((!exactLabelMatch || exactLabelMatch.id === 'spices-dried') && capsicum.keywords.some(k => text.includes(k))) {
-    return capsicum;
+    const isMixture = /amestec|mix/.test(text);
+    return isMixture ? RULE_PROFILES.find(r => r.id === 'spices-dried') : capsicum;
   }
   if (exactLabelMatch) return exactLabelMatch;
 

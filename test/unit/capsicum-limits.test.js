@@ -101,3 +101,28 @@ test('alte potriviri nu sunt afectate (mapări reprezentative)', () => {
   };
   for (const [name, id] of Object.entries(cases)) assert.equal(getRuleProfile('', name).id, id, name);
 });
+
+test('amestecuri de mirodenii cu Capsicum: limita OTA 15 (spices-dried)', () => {
+  for (const name of ['Amestec mirodenii cu boia', 'Mix chilli și piper', 'Mixtură paprika']) {
+    assert.equal(getRuleProfile('', name).id, 'spices-dried', name);
+    assert.equal(getRuleProfile('Mirodenii uscate', name).id, 'spices-dried', `${name} (categorie explicită)`);
+  }
+});
+
+test('„Amestec mirodenii cu boia” cu OTA 18: neconform', () => {
+  assert.equal(evalOta(getRuleProfile('', 'Amestec mirodenii cu boia'), 18), 'fail');
+});
+
+test('„Mix chilli și piper” cu OTA 18: neconform', () => {
+  assert.equal(evalOta(getRuleProfile('', 'Mix chilli și piper'), 18), 'fail');
+});
+
+test('„Boia dulce” cu OTA 18: conform; „Piper negru” cu 18: neconform', () => {
+  assert.equal(evalOta(getRuleProfile('', 'Boia dulce'), 18), 'ok');
+  assert.equal(evalOta(getRuleProfile('', 'Piper negru'), 18), 'fail');
+});
+
+test('cuvântul „amestec” fără Capsicum nu schimbă potrivirea altor produse', () => {
+  assert.equal(getRuleProfile('', 'Amestec cereale grâu').id, 'cereals-final-consumer');
+  assert.equal(getRuleProfile('', 'Boia dulce').id, 'capsicum-dried');
+});

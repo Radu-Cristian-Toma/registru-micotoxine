@@ -131,5 +131,5 @@ test('citările source ale fructelor uscate și smochinelor conțin punctele de 
   const src = (id) => RULE_PROFILES.find(r => r.id === id).source;
   assert.match(src('dried-fruit-final'), /pct\. 1\.1\.2 și 1\.2\.1\.2/);
   assert.match(src('dried-fruit-sorting'), /pct\. 1\.1\.1 și 1\.2\.1\.2/);
-  assert.match(src('dried-figs-final'), /pct\. 1\.1\.3 și 1\.2\.2/);
+  assert.match(src('dried-figs-final'), /pct\. 1\.1\.3 și 1\.2\.1\.1/);
 });

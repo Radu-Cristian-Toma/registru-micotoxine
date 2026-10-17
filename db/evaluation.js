@@ -279,6 +279,18 @@ function evaluateResult(result) {
   return 'in_analysis';
 }
 
+// Evaluarea completa (toti analitii: aflatoxine, OTA, M1, DON, ZEA, fumonizine)
+// pornind de la un rand de interogare cu aliasurile folosite in rutele de
+// arhiva/export (afb1..fum, limitAfb1..limitFum, qcStatus). Delega la
+// evaluateResult(), deci aplica exact aceeasi logica ca in coada si detaliu.
+function evaluateArchiveRow(r) {
+  return evaluateResult({
+    afb1: r.afb1, afb2: r.afb2, afg1: r.afg1, afg2: r.afg2, ota: r.ota, m1: r.m1, don: r.don, zea: r.zea, fum: r.fum,
+    limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, limit_m1: r.limitM1,
+    limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus
+  });
+}
+
 // Grupuri de analize comandabile separat de client, la pretul lor propriu -
 // aflatoxinele (B1+B2+G1+G2+suma) se testeaza mereu impreuna ca un singur
 // pachet (limita legala foloseste explicit suma lor), restul contaminantilor
@@ -303,4 +315,4 @@ function availableGroupsForProfile(profile) {
   return groups;
 }
 
-module.exports = { DEFAULT_LIMITS, RULE_PROFILES, getRuleProfile, evaluateResult, TEST_GROUP_KEYS, availableGroupsForProfile };
+module.exports = { DEFAULT_LIMITS, RULE_PROFILES, getRuleProfile, evaluateResult, evaluateArchiveRow, TEST_GROUP_KEYS, availableGroupsForProfile };

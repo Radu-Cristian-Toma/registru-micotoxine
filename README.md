@@ -79,8 +79,36 @@ Limitele legale pentru micotoxine sunt corelate cu Reg. (UE) 2023/915 (inclusiv 
 1. `npm install`
 2. copiați `.env.example` în `.env`
 3. setați `SESSION_SECRET` cu o valoare aleatoare suficient de lungă
-4. `npm start`
+4. `npm start` — implicit, serverul ascultă numai pe `127.0.0.1` (local)
 5. pentru contul inițial de administrator: `npm run seed-admin -- admin@example.com parola NumeAdmin`
+
+### Adresa de ascultare
+
+Implicit, serverul ascultă numai pe `127.0.0.1`, deci aplicația este accesibilă doar de pe calculatorul pe care rulează. Variabila de mediu `LIMS_HOST` (în `.env`) schimbă adresa; de exemplu `LIMS_HOST=0.0.0.0` deschide aplicația în rețeaua locală.
+
+**Avertisment:** aplicația folosește în această etapă parole simple de test. Nu o expuneți într-o rețea sau pe internet cu date reale. Codul QR al buletinului codifică adresa de rețea locală a serverului; cu ascultarea implicită (numai local) el nu poate fi deschis de pe alt dispozitiv.
+
+## Copie de siguranță și restaurare
+
+Copie de siguranță (metoda de backup a SQLite, consistentă și în modul WAL; copia este verificată automat prin `integrity_check` și `foreign_key_check`, iar o copie nevalidă este ștearsă):
+
+`npm run backup` (director implicit `backup/`, exclus din git) sau `node scripts/backup-db.js <director>`
+
+Baza sursă se poate indica prin `LIMS_DB_PATH` (implicit `db/lims.db`).
+
+Restaurare:
+
+1. opriți serverul;
+2. verificați copia: `node scripts/backup-db.js --verify <copie.db>`;
+3. păstrați baza curentă separat (`db/lims.db`, `db/lims.db-wal`, `db/lims.db-shm`);
+4. ștergeți din `db/` fișierele `lims.db-wal` și `lims.db-shm`, apoi copiați copia verificată ca `db/lims.db`;
+5. porniți serverul și verificați probele recente.
+
+Frecvența copiilor, locul de păstrare, retenția și testele periodice de restaurare rămân de stabilit de laborator [de completat].
+
+## Teste automate
+
+`npm test` rulează testele din `test/unit/` (`node:test`, fără dependențe noi; baze de date temporare, date inventate). Scripturile `test/*.cjs` sunt scripturi de acceptanță separate.
 
 ## Documentație
 

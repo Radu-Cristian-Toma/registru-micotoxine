@@ -1,0 +1,401 @@
+{
+ "produs": "Registru Micotoxine v1.53.5",
+ "limba": "en",
+ "captura": "pe element",
+ "inceput": "2026-10-07T17:57:18.050Z",
+ "pasi": [
+  {
+   "n": 1,
+   "titlu": "Beneficiar: creare cont prin interfață",
+   "ms": 2833,
+   "ok": true,
+   "detaliu": {
+    "cont": "beneficiar@test.local"
+   }
+  },
+  {
+   "n": 2,
+   "titlu": "Beneficiar: formular probă nouă, cu atestarea prelevării",
+   "ms": 2521,
+   "ok": true,
+   "detaliu": {
+    "cod": "MYC-2026-0001"
+   }
+  },
+  {
+   "n": 3,
+   "titlu": "NEGATIV — API: probă fără atestarea prelevării",
+   "ms": 6,
+   "ok": true,
+   "detaliu": {
+    "status": 400,
+    "mesaj": "Trebuie să confirmi corectitudinea prelevării înainte de a înregistra proba."
+   }
+  },
+  {
+   "n": 4,
+   "titlu": "NEGATIV — API: dată de prelevare în viitor",
+   "ms": 4,
+   "ok": true,
+   "detaliu": {
+    "status": 400,
+    "mesaj": "Data prelevării nu poate fi în viitor."
+   }
+  },
+  {
+   "n": 5,
+   "titlu": "Administrator: creare cont operator",
+   "ms": 4089,
+   "ok": true,
+   "detaliu": {
+    "operator": "operator@test.local"
+   }
+  },
+  {
+   "n": 6,
+   "titlu": "Administrator: creare cont validator",
+   "ms": 1038,
+   "ok": true,
+   "detaliu": {
+    "validator": "validator@test.local"
+   }
+  },
+  {
+   "n": 7,
+   "titlu": "Administrator: roluri și conturi",
+   "ms": 686,
+   "ok": true,
+   "detaliu": {
+    "randuri": 0
+   }
+  },
+  {
+   "n": 8,
+   "titlu": "Administrator: pregătire pentru acreditare (ISO/IEC 17025)",
+   "ms": 3926,
+   "ok": true,
+   "detaliu": {
+    "iso": true
+   }
+  },
+  {
+   "n": 9,
+   "titlu": "Administrator: tablou de bord — indicatori operaționali",
+   "ms": 3072,
+   "ok": true,
+   "detaliu": {
+    "tab": "dashboard"
+   }
+  },
+  {
+   "n": 10,
+   "titlu": "Operator: coada de lucru conține proba",
+   "ms": 3486,
+   "ok": true,
+   "detaliu": {
+    "randuri": 1
+   }
+  },
+  {
+   "n": 11,
+   "titlu": "Operator: poarta de intrare (confirmarea primirii fizice)",
+   "ms": 2284,
+   "ok": true,
+   "detaliu": {
+    "poarta": "confirmată"
+   }
+  },
+  {
+   "n": 12,
+   "titlu": "Operator: câmpurile lipsă sunt enumerate, trimiterea e blocată",
+   "ms": 7,
+   "ok": true,
+   "detaliu": {
+    "blocante": "Still missing: Results of the requested tests, Analysis date, Analytical method, Equipment",
+    "butonDezactivat": true
+   }
+  },
+  {
+   "n": 13,
+   "titlu": "Operator: completare rezultate + control de calitate",
+   "ms": 1747,
+   "ok": true,
+   "detaliu": {
+    "completate": "afb1=1.20, afb2=0.15, afg1=0.30, afg2=0.10, ota=0.80, don=500, zea=50"
+   }
+  },
+  {
+   "n": 14,
+   "titlu": "Operator: salvare rezultate + urma de audit a probei",
+   "ms": 2550,
+   "ok": true,
+   "detaliu": {
+    "stare": "All changes are saved."
+   }
+  },
+  {
+   "n": 15,
+   "titlu": "Operator: trimitere spre validare",
+   "ms": 1817,
+   "ok": true,
+   "detaliu": {
+    "trimis": true
+   }
+  },
+  {
+   "n": 16,
+   "titlu": "NEGATIV — API: operatorul încearcă să valideze (rol insuficient)",
+   "ms": 13,
+   "ok": true,
+   "detaliu": {
+    "status": 403,
+    "mesaj": "Nu ai permisiunea pentru această acțiune.",
+    "butonVizibil": false
+   }
+  },
+  {
+   "n": 17,
+   "titlu": "Validator: revizuirea independentă înainte de emitere",
+   "ms": 2600,
+   "ok": true,
+   "detaliu": {
+    "revizuire": "deschisă"
+   }
+  },
+  {
+   "n": 18,
+   "titlu": "Validator: aprobare și emitere buletin",
+   "ms": 3207,
+   "ok": true,
+   "detaliu": {
+    "nrBuletin": "BUL-2026-00001"
+   }
+  },
+  {
+   "n": 19,
+   "titlu": "NEGATIV — API: re-validarea unui buletin emis",
+   "ms": 14,
+   "ok": true,
+   "detaliu": {
+    "status": 403,
+    "mesaj": "Rezultatul este deja validat. Un buletin validat nu poate fi re-emis sau re-validat."
+   }
+  },
+  {
+   "n": 20,
+   "titlu": "Buletinul emis, cu codul QR (portalul beneficiarului)",
+   "ms": 5363,
+   "ok": true,
+   "detaliu": {
+    "qr": true,
+    "nrBuletin": "BUL-2026-00001"
+   }
+  },
+  {
+   "n": 21,
+   "titlu": "Verificare publică fără autentificare",
+   "ms": 4198,
+   "ok": true,
+   "detaliu": {
+    "nrBuletin": "BUL-2026-00001",
+    "faraAutentificare": true
+   }
+  },
+  {
+   "n": 22,
+   "titlu": "Eticheta fizică a probei (QR + cod de bare)",
+   "ms": 6897,
+   "ok": true,
+   "detaliu": {
+    "eticheta": true,
+    "coduri": 2,
+    "buton": "chemată direct"
+   }
+  },
+  {
+   "n": 23,
+   "titlu": "Administrator: urma de audit a probei",
+   "ms": 4345,
+   "ok": true,
+   "detaliu": {
+    "intrari": 6,
+    "actiuni": "result_validated → review_approved → results_saved → results_saved → results_saved → sampling_attested"
+   }
+  },
+  {
+   "n": 24,
+   "titlu": "Administrator: tabloul de bord după rulare",
+   "ms": 2296,
+   "ok": true,
+   "detaliu": {
+    "recapturat": true
+   }
+  }
+ ],
+ "capturi": [
+  {
+   "nr": 1,
+   "fisier": "figura-01-inregistrare-proba-atestare.png",
+   "titlu": "Sample-owner registration form with the sampling attestation",
+   "kb": 273,
+   "pixeli": "1266x2886"
+  },
+  {
+   "nr": 2,
+   "fisier": "figura-02-roluri-si-conturi.png",
+   "titlu": "Role and account management: analyst and validator accounts",
+   "kb": 193,
+   "pixeli": "3000x2457"
+  },
+  {
+   "nr": 3,
+   "fisier": "figura-03-pregatire-acreditare.png",
+   "titlu": "Accreditation readiness: requirements coverage summary (ISO/IEC 17025:2017)",
+   "kb": 252,
+   "pixeli": "3240x1419"
+  },
+  {
+   "nr": 4,
+   "fisier": "figura-04-mapare-iso-17025.png",
+   "titlu": "Requirement-by-requirement mapping: what the application must support, and the evidence",
+   "kb": 490,
+   "pixeli": "3240x3144"
+  },
+  {
+   "nr": 5,
+   "fisier": "figura-05-tablou-bord-admin.png",
+   "titlu": "Administrator dashboard: operational indicators",
+   "kb": 233,
+   "pixeli": "4080x4950"
+  },
+  {
+   "nr": 6,
+   "fisier": "figura-06-coada-de-lucru.png",
+   "titlu": "Analyst work queue: samples awaiting processing",
+   "kb": 113,
+   "pixeli": "960x6690"
+  },
+  {
+   "nr": 7,
+   "fisier": "figura-07-poarta-de-intrare.png",
+   "titlu": "Intake gate: the analyst must confirm physical receipt before any result is recorded",
+   "kb": 83,
+   "pixeli": "1920x663"
+  },
+  {
+   "nr": 8,
+   "fisier": "figura-08-formular-rezultate.png",
+   "titlu": "Analyst result entry: measured values, method, equipment and quality-control decision",
+   "kb": 446,
+   "pixeli": "2820x3894"
+  },
+  {
+   "nr": 9,
+   "fisier": "figura-09-pista-de-audit.png",
+   "titlu": "Append-only history of one sample: attestation, result saves, review steps",
+   "kb": 179,
+   "pixeli": "2646x1635"
+  },
+  {
+   "nr": 10,
+   "fisier": "figura-10-revizuire-validator.png",
+   "titlu": "Independent review by the validator: the dossier is read-only and the decision is recorded",
+   "kb": 520,
+   "pixeli": "2820x5154"
+  },
+  {
+   "nr": 11,
+   "fisier": "figura-11-buletin-emis-qr.png",
+   "titlu": "Released bulletin as the client receives it: unique number, QR code, per-analyte verdicts",
+   "kb": 694,
+   "pixeli": "2820x5037"
+  },
+  {
+   "nr": 12,
+   "fisier": "figura-12-verificare-publica.png",
+   "titlu": "Public verification page for a released bulletin (no account required)",
+   "kb": 634,
+   "pixeli": "2580x5250"
+  },
+  {
+   "nr": 13,
+   "fisier": "figura-13-eticheta-probei.png",
+   "titlu": "Physical sample label generated by the system: QR code and Code 128 barcode",
+   "kb": 46,
+   "pixeli": "1680x2340"
+  },
+  {
+   "nr": 14,
+   "fisier": "figura-14-tablou-bord-admin-dupa-rulare.png",
+   "titlu": "Operational dashboard after the run",
+   "kb": 228,
+   "pixeli": "4080x4200"
+  }
+ ],
+ "capturiEsuate": [],
+ "interactiuniUI": 65,
+ "eroriConsola": [
+  "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+  "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+  "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+  "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+ ],
+ "date": {
+  "categorieAlesa": "Cereals / derived products for the final consumer",
+  "codProba": "MYC-2026-0001",
+  "contine17025": true,
+  "listaBlocante": "Still missing: Results of the requested tests, Analysis date, Analytical method, Equipment",
+  "controlOperator": {
+   "status": 403,
+   "mesaj": "Nu ai permisiunea pentru această acțiune.",
+   "butonVizibil": false
+  },
+  "nrBuletin": "BUL-2026-00001",
+  "idProba": 1,
+  "rezultate": {
+   "afb1": 1.2,
+   "afb2": 0.15,
+   "afg1": 0.3,
+   "afg2": 0.1,
+   "ota": 0.8,
+   "don": 500,
+   "zea": 50,
+   "fum": null
+  },
+  "limite": {
+   "afb1": 2,
+   "aflaSum": 4,
+   "ota": 3,
+   "don": 750,
+   "zea": 75,
+   "fum": null
+  },
+  "bulletinIssuedAt": "2026-10-07 20:57:53",
+  "validatDe": "Validator Test",
+  "textPublic": "Bulletin authenticity verification Verificare autenticitate buletin USAMV București · Facultatea de Biotehnologii ✓ Authentic bulletin — issued by the laboratory on Buletin autentic — emis de laborator la 2026-10-07 20:57:53. Test Report Buletin de analiză — MYC-2026-0001 Bulletin no.:Nr. buletin: BUL-2026-00001 Compliant Conform Sample / batch name Denumire probă / lot Maize grain — lot 26/0417 P",
+  "auditBrut": "{\"audit\":[{\"id\":6,\"action\":\"result_validated\",\"details\":\"{\\\"status\\\":\\\"ok\\\",\\\"bulletinNo\\\":\\\"BUL-2026-00001\\\"}\",\"createdAt\":\"2026-10-07 20:57:53\",\"userName\":\"Validator Test\"},{\"id\":5,\"action\":\"review_approved\",\"details\":\"{\\\"note\\\":\\\"Approved — acceptance run\\\"}\",\"createdAt\":\"2026-10-07 20:57:51\",\"userName\":\"Validator Test\"},{\"id\":4,\"action\":\"results_saved\",\"details\":\"{\\\"results\\\":{\\\"afb1\\\":1.2,\\\"afb2\\\":0.15,\\\"afg1\\\":0.3,\\\"afg2\\\":0.1,\\\"ota\\\":0.8,\\\"m1\\\":null,\\\"don\\\":500,\\\"zea\\\":50,\\\"fum\\\":null},\\\"limits\\\":{\\\"afb1\\\":2,\\\"aflaSum\\\":4,\\\"ota\\\":3,\\\"m1\\\":null,\\\"don\\\":750,\\\"zea\\\":75,\\\"fum\\\":null},\\\"method\\\":\\\"HPLC-FLD, method MT-01\\\",\\\"qcStatus\\\":\\\"accepted\\\",\\\"status\\\":\\\"ok\\\"}\",\"createdAt\":\"2026-10-07 20:57:47\",\"userName\":\"Operator Test\"},{\"id\":3,\"action\":\"results_saved\",\"details\":\"{\\\"results\\\":{\\\"afb1\\\":1.2,\\\"afb2\\\":0.15,\\\"afg1\\\":0.3,\\\"afg2\\\":0.1,\\\"ota\\\":0.8,\\\"m1\\\":null,\\\"don\\\":500,\\\"zea\\\":50,\\\"fum\\\":null},\\\"limits\\\":{\\\"afb1\\\":2,\\\"aflaSum\\\":4,\\\"ota\\\":3,\\\"m1\\\":null,\\\"don\\\":750,\\\"zea\\\":75,\\\"fum\\\":null},\\\"method\\\":\\\"HPLC-FLD, method MT-01\\\",\\\"qcStatus\\\":null,\\\"status\\\":\\\"ok\\\"}\",\"createdAt\":\"2026-10-07 20:57:44\",\"userName\":\"Operator Test\"},{\"id\":2,\"action\":\"results_saved\",\"details\":\"{\\\"results\\\":{\\\"afb1\\\":null,\\\"afb2\\\":null,\\\"afg1\\\":null,\\\"afg2\\\":null,\\\"ota\\\":null,\\\"m1\\\":null,\\\"don\\\":null,\\\"zea\\\":null,\\\"fum\\\":null},\\\"limits\\\":{\\\"afb1\\\":2,\\\"aflaSum\\\":4,\\\"ota\\\":3,\\\"m1\\\":null,\\\"don\\\":750,\\\"zea\\\":75,\\\"fum\\\":null},\\\"method\\\":null,\\\"qcStatus\\\":null,\\\"status\\\":\\\"pending\\\"}\",\"createdAt\":\"2026-10-07 20:57:41\",\"userName\":\"Operator Test\"},{\"id\":1,\"action\":\"sampling_attested\",\"details\":\"{\\\"attestedAt\\\":\\\"2026-10-07T17:57:23.147Z\\\"}\",\"createdAt\":\"2026-10-07 20:57:23\",\"userName\":\"Ferma Test SRL\"}]}",
+  "actiuniAudit": [
+   "result_validated",
+   "review_approved",
+   "results_saved",
+   "results_saved",
+   "results_saved",
+   "sampling_attested"
+  ],
+  "nrIntrariAudit": 6
+ },
+ "dialogs": [
+  {
+   "tip": "prompt",
+   "mesaj": "Note for approval (optional):"
+  },
+  {
+   "tip": "confirm",
+   "mesaj": "Confirm validating the result and issuing the bulletin?"
+  }
+ ],
+ "sfarsit": "2026-10-07T17:58:18.206Z",
+ "durataTotala": 58999,
+ "pasiReusiti": 24,
+ "pasiTotal": 24
+}

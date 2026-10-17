@@ -1,0 +1,56 @@
+const fs = require('fs');
+const path = require('path');
+const cp = require('child_process');
+
+const root = path.resolve(__dirname, '..');
+const required = [
+  'server.js',
+  'middleware/auth.js',
+  'middleware/rate-limit.js',
+  'middleware/csrf.js',
+  'routes/auth.js',
+  'routes/admin.js',
+  'routes/samples.js',
+  'routes/results.js',
+  'routes/dashboard.js',
+  'routes/validation.js',
+  'routes/incidents.js',
+  'db/database.js',
+  'db/evaluation.js',
+  'db/session-store.js',
+  'public/index.html',
+  'public/app.js',
+  'public/i18n.js',
+  'public/style.css',
+  'public/verify.html',
+  'README.md',
+  '.env.example'
+];
+
+const errors = [];
+for (const file of required) {
+  if (!fs.existsSync(path.join(root, file))) errors.push(`Lipsește fișierul obligatoriu: ${file}`);
+}
+
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+if (pkg.version !== '1.53.5') errors.push(`package.json are versiunea ${pkg.version}`);
+if (lock.version !== '1.53.5' || lock.packages?.['']?.version !== '1.53.5') errors.push('package-lock.json nu este sincronizat cu v1.53.5');
+
+for (const file of required.filter(f => f.endsWith('.js'))) {
+  const full = path.join(root, file);
+  const r = cp.spawnSync(process.execPath, ['--check', full], { encoding: 'utf8' });
+  if (r.status !== 0) errors.push(`Sintaxă invalidă: ${file}\n${r.stderr.trim()}`);
+}
+
+const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+if (!readme.includes('v1.53.5')) errors.push('README.md nu identifică release-ul v1.53.');
+
+if (errors.length) {
+  console.error('RELEASE CHECK: FAILED');
+  errors.forEach(e => console.error(`- ${e}`));
+  process.exit(1);
+}
+
+console.log('RELEASE CHECK: PASSED');
+console.log('v1.53.5: structură, versiuni și sintaxa JavaScript sunt coerente.');

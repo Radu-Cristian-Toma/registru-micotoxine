@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificare buletin / Bulletin verification — USAMV Biotehnologii</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script src="/i18n.js"></script>
+<style>
+  .verify-wrap {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+  .verify-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .verify-header h1 { font-size: 18px; margin: 0 0 6px; }
+  .verify-header p { font-size: 13px; color: var(--ink-soft); margin: 0; }
+  .verify-status-banner {
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+  }
+  .verify-status-banner.valid { background: var(--ok-bg); color: var(--ok); }
+  .verify-status-banner.invalid { background: var(--danger-bg); color: var(--danger); }
+  .verify-status-banner .icon { font-size: 22px; }
+  .verify-loading { text-align: center; padding: 60px 20px; color: var(--neutral); font-size: 13px; }
+  .verify-footer-note {
+    margin-top: 24px;
+    font-size: 11.5px;
+    color: var(--neutral);
+    text-align: center;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="verify-wrap">
+  <div class="verify-header">
+    <h1 id="page-title"></h1>
+    <p>USAMV București · Facultatea de Biotehnologii</p>
+  </div>
+  <div id="content"><div class="verify-loading" id="loading-text"></div></div>
+  <div class="verify-footer-note" id="footer-note"></div>
+</div>
+
+<script>
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// Populeaza header-ul si footer-ul static, bilingv, la incarcarea paginii.
+document.getElementById('page-title').innerHTML = bt('verify.pageTitle');
+document.getElementById('loading-text').innerHTML = bt('verify.checking');
+document.getElementById('footer-note').innerHTML = bt('verify.footerNote');
+
+function statusLabel(status) {
+  if (status === 'ok') return bt('common.conform');
+  if (status === 'fail') return bt('common.exceeded');
+  if (status === 'in_analysis') return bt('common.inAnalysis');
+  return bt('common.pending');
+}
+
+function row(label, value, limit) {
+  if (value === null || value === undefined) return '';
+  const hasLimit = (limit !== null && limit !== undefined);
+  // Fara limita proprie nu exista verdict: micotoxinele acoperite de limita
+  // sumei (B2, G1, G2) se marcheaza ca atare, nu se declara conforme.
+  const limitText = hasLimit ? limit : '—';
+  const flag = !hasLimit
+    ? `<span class="result-flag empty">${bt('bulletin.noLimit')}</span>`
+    : (value > limit
+        ? `<span class="result-flag fail">${bt('common.exceeded')}</span>`
+        : `<span class="result-flag ok">${bt('common.conform')}</span>`);
+  return `
+    <tr>
+      <td class="name-cell" style="padding-left:28px;">${label}</td>
+      <td class="mono readonly-val">${value}</td>
+      <td class="limit-cell mono">${limitText}</td>
+      <td>${flag}</td>
+    </tr>
+  `;
+}
+
+async function loadVerification() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const bulletinNo = decodeURIComponent(parts[parts.length - 1] || '');
+  const content = document.getElementById('content');
+
+  if (!bulletinNo) {
+    content.innerHTML = `<div class="verify-status-banner invalid"><span class="icon">✕</span><div>${bt('verify.noBulletinNumber')}</div></div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/results/public/verify/${encodeURIComponent(bulletinNo)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      content.innerHTML = `
+        <div class="verify-status-banner invalid">
+          <span class="icon">✕</span>
+          <div>${bt('verify.bulletinLabel')} <strong>${escapeHtml(bulletinNo)}</strong> ${bt('verify.notFoundLine1')}<br>
+          ${bt('verify.notFoundLine2')}</div>
+        </div>
+      `;
+      return;
+    }
+
+    const b = data.bulletin;
+    const isFail = b.status === 'fail';
+
+    content.innerHTML = `
+      <div class="verify-status-banner valid">
+        <span class="icon">✓</span>
+        <div>${bt('verify.authenticIssuedAt')} ${escapeHtml(b.issuedAt || '—')}.</div>
+      </div>
+
+      <div class="bulletin">
+        <div class="bulletin-head">
+          <div>
+            <h1>${bt('bulletin.title')} — ${escapeHtml(b.code)}</h1>
+            <div class="institution">${bt('verify.bulletinNumberShort')} ${escapeHtml(b.bulletinNo)}</div>
+          </div>
+          <div class="verdict ${b.status}">${statusLabel(b.status)}</div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field"><label>${bt('bulletin.productLabel')}</label><div class="field-static">${escapeHtml(b.productName)}</div></div>
+          <div class="field"><label>${bt('bulletin.categoryLabel')}</label><div class="field-static">${b.category ? btCategory(b.category) : '—'}</div></div>
+          <div class="field"><label>${bt('bulletin.analysisDateLabel')}</label><div class="field-static">${b.analysisDate || '—'}</div></div>
+          <div class="field"><label>${bt('bulletin.method')}</label><div class="field-static">${escapeHtml(b.method || '—')}</div></div>
+          <div class="field"><label>${bt('bulletin.equipment')}</label><div class="field-static">${escapeHtml(b.equipment || '—')}</div></div>
+          <div class="field"><label>${bt('verify.validatedBy')}</label><div class="field-static">${bt('verify.validatorRole')}</div></div>
+          <div class="field"><label>${bt('verify.validationDate')}</label><div class="field-static">${b.validatedAt || '—'}</div></div>
+        </div>
+
+        <div class="section-label">${bt('bulletin.contaminants')} <span class="unit">(µg/kg)</span></div>
+        <table class="contaminants">
+          <thead>
+            <tr><th style="padding-left:28px;">${bt('bulletin.contaminant')}</th><th>${bt('bulletin.result')}</th><th>${bt('bulletin.maxLimit')}</th><th>${bt('bulletin.verdict')}</th></tr>
+          </thead>
+          <tbody>
+            ${row(bt('bulletin.afb1Name'), b.results.afb1, b.limits.afb1)}
+            ${row(bt('bulletin.afb2Name'), b.results.afb2, null)}
+            ${row(bt('bulletin.afg1Name'), b.results.afg1, null)}
+            ${row(bt('bulletin.afg2Name'), b.results.afg2, null)}
+            ${b.results.aflaSum !== null ? `
+            <tr class="sum-row">
+              <td class="name-cell">${bt('bulletin.aflatoxinSum')}</td>
+              <td class="mono">${b.results.aflaSum.toFixed(2)}</td>
+              <td class="limit-cell mono">${b.limits.aflaSum ?? '—'}</td>
+              <td>${(b.limits.aflaSum !== null && b.results.aflaSum > b.limits.aflaSum) ? `<span class="result-flag fail">${bt('common.exceeded')}</span>` : `<span class="result-flag ok">${bt('common.conform')}</span>`}</td>
+            </tr>` : ''}
+            ${row('Ochratoxina A (OTA)', b.results.ota, b.limits.ota)}
+            ${b.results.m1 !== null && b.results.m1 !== undefined ? row(bt('bulletin.aflatoxinM1Name'), b.results.m1, b.limits.m1) : ''}
+            ${b.results.don !== null && b.results.don !== undefined ? row(bt('bulletin.donName'), b.results.don, b.limits.don) : ''}
+            ${b.results.zea !== null && b.results.zea !== undefined ? row(bt('bulletin.zeaName'), b.results.zea, b.limits.zea) : ''}
+            ${b.results.fum !== null && b.results.fum !== undefined ? row(bt('bulletin.fumName'), b.results.fum, b.limits.fum) : ''}
+          </tbody>
+        </table>
+        <div class="section-hint" style="margin-top:14px;">${bt('bulletin.samplingDisclaimer')}</div>
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = `<div class="verify-status-banner invalid"><span class="icon">✕</span><div>${bt('verify.verificationError')}</div></div>`;
+  }
+}
+
+loadVerification();
+</script>
+
+</body>
+</html>

@@ -83,49 +83,55 @@ const RULE_PROFILES = [
     label: 'Fructe uscate pentru consumatorul final (exclusiv smochine)',
     keywords: ['fructe uscate', 'stafide', 'curmale uscate', 'prune uscate', 'caise uscate'],
     limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 2.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.4 și 1.2.3'
+    // aflatoxine (1.1.x) și OTA (1.2.x) verificate de Hermes 17.10.2026 pe EUR-Lex consolidat; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.2 și 1.2.1.2'
   },
   {
     id: 'dried-fruit-sorting',
     label: 'Fructe uscate înainte de sortare / alt tratament fizic',
     keywords: ['fructe uscate sortare', 'fructe uscate tratament fizic'],
     limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 2.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.3 și 1.2.3'
+    // aflatoxine (1.1.x) și OTA (1.2.x) verificate de Hermes 17.10.2026 pe EUR-Lex consolidat; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.1 și 1.2.1.2'
   },
   {
     id: 'dried-figs-final',
     label: 'Smochine uscate pentru consumatorul final',
     keywords: ['smochine uscate', 'smochine'],
     limit_afb1: 6.0, limit_afla_sum: 10.0, limit_ota: 8.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.6 și 1.2.2'
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.3 și 1.2.2'
   },
   {
     id: 'peanuts-oilseeds-final',
     label: 'Arahide și alte semințe oleaginoase pentru consumatorul final',
     keywords: ['arahide', 'semințe oleaginoase', 'seminte oleaginoase', 'floarea soarelui', 'rapiță', 'rapita', 'soia'],
     limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: null,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.9'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.5'
   },
   {
     id: 'peanuts-oilseeds-sorting',
     label: 'Arahide și semințe oleaginoase înainte de sortare',
     keywords: ['arahide sortare', 'arahide tratament fizic'],
     limit_afb1: 8.0, limit_afla_sum: 15.0, limit_ota: null,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.7'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.4'
   },
   {
     id: 'tree-nuts-final',
     label: 'Fructe cu coajă lemnoasă pentru consumatorul final (exclusiv migdale/fistic/caise/alune de pădure/nuci de Brazilia)',
     keywords: ['nuci', 'alune', 'fructe cu coajă', 'fructe cu coaja'],
     limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: null,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.11'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.7'
   },
   {
     id: 'tree-nuts-sorting',
     label: 'Fructe cu coajă lemnoasă înainte de sortare',
     keywords: ['nuci sortare', 'alune sortare', 'fructe cu coajă sortare'],
     limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: null,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.10'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.6'
   },
   {
     id: 'almonds-pistachios-apricot-sorting',
@@ -156,32 +162,45 @@ const RULE_PROFILES = [
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.11'
   },
   {
+    id: 'capsicum-dried',
+    label: 'Capsicum spp. uscat (boia, paprika, ardei iute, chilli, cayenne)',
+    keywords: ['boia', 'paprika', 'ardei iute', 'chilli', 'cayenne'],
+    limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 20.0,
+    // aflatoxine (1.1.x) și OTA (1.2.x) verificate de Hermes 17.10.2026 pe EUR-Lex consolidat; de reconfirmat de laborator pe textul oficial
+    // (limita OTA de 20 µg/kg pentru Capsicum este confirmata si de Reg. (UE) 2022/1370)
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.14 și 1.2.18'
+  },
+  {
     id: 'spices-dried',
     label: 'Mirodenii uscate',
-    keywords: ['mirodenii', 'condimente', 'boia', 'piper', 'ghimbir', 'nucșoară', 'nucsoara', 'curcuma', 'turmeric'],
+    keywords: ['mirodenii', 'condimente', 'piper', 'ghimbir', 'nucșoară', 'nucsoara', 'curcuma', 'turmeric'],
     limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 15.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.14 și 1.2.13'
+    // aflatoxine (1.1.x) și OTA (1.2.x) verificate de Hermes 17.10.2026 pe EUR-Lex consolidat; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.14 și 1.2.17'
   },
   {
     id: 'roasted-coffee',
     label: 'Cafea prăjită (boabe și măcinată)',
     keywords: ['cafea', 'cafea prăjită', 'cafea prajita', 'cafea măcinată', 'cafea macinata'],
     limit_afb1: null, limit_afla_sum: null, limit_ota: 3.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.2.5'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.2.14'
   },
   {
     id: 'wine',
     label: 'Vin și alte băuturi pe bază de must de struguri',
     keywords: ['vin', 'must de struguri', 'must struguri'],
     limit_afb1: null, limit_afla_sum: null, limit_ota: 2.0,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.2.8'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.2.20'
   },
   {
     id: 'raw-milk',
     label: 'Lapte crud, lapte tratat termic și lapte pentru produse lactate',
     keywords: ['lapte crud', 'lapte', 'lapte tratat termic'],
     limit_afb1: null, limit_afla_sum: null, limit_ota: null, limit_m1: 0.050,
-    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.15 (aflatoxina M1)'
+    // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
+    source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.16 (aflatoxina M1)'
   }
 ];
 
@@ -193,6 +212,17 @@ function getRuleProfile(category = '', productName = '') {
   // scris liber), acel profil e potrivirea corecta, indiferent de ambiguitati
   // intre cuvinte-cheie ale unor profiluri generale vs. specifice/sortare.
   const exactLabelMatch = RULE_PROFILES.find(r => text.includes(r.label.toLowerCase()));
+
+  // Capsicum spp. are limita OTA proprie (mai mare decat restul mirodeniilor),
+  // deci are prioritate fata de categoria generala "Mirodenii uscate", chiar
+  // daca aceasta a fost aleasa explicit din lista. Nu suprascrie alte etichete exacte.
+  // Exceptie: un amestec de mirodenii (text cu "amestec", "mix", "mixtura") care
+  // contine Capsicum ramane la limita generala a mirodeniilor (spices-dried).
+  const capsicum = RULE_PROFILES.find(r => r.id === 'capsicum-dried');
+  if ((!exactLabelMatch || exactLabelMatch.id === 'spices-dried') && capsicum.keywords.some(k => text.includes(k))) {
+    const isMixture = /amestec|mix/.test(text);
+    return isMixture ? RULE_PROFILES.find(r => r.id === 'spices-dried') : capsicum;
+  }
   if (exactLabelMatch) return exactLabelMatch;
 
   // Profilurile de "sortare / tratament fizic" sunt verificate primele pentru
@@ -208,7 +238,7 @@ function getRuleProfile(category = '', productName = '') {
   // Profiluri specifice (subcategorii cu limite proprii) inaintea celor generale.
   const specificProfiles = [
     'dried-figs-final', 'almonds-pistachios-apricot-final', 'hazelnuts-brazil-final',
-    'roasted-coffee', 'wine', 'raw-milk', 'spices-dried', 'maize-unprocessed'
+    'roasted-coffee', 'wine', 'raw-milk', 'capsicum-dried', 'spices-dried', 'maize-unprocessed'
   ];
   for (const id of specificProfiles) {
     const profile = RULE_PROFILES.find(r => r.id === id && r.keywords.some(k => text.includes(k)));

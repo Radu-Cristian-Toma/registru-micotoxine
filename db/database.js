@@ -1,7 +1,9 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'lims.db');
+// LIMS_DB_PATH permite teste si scripturi (backup) pe o baza temporara;
+// implicit ramane db/lims.db.
+const DB_PATH = process.env.LIMS_DB_PATH || path.join(__dirname, 'lims.db');
 const db = new Database(DB_PATH);
 
 db.pragma('journal_mode = WAL');

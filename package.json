@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "seed-admin": "node db/seed-admin.js",
-    "release-check": "node scripts/release-check.js"
+    "release-check": "node scripts/release-check.js",
+    "backup": "node scripts/backup-db.js",
+    "test": "node --test \"test/unit/*.test.js\""
   },
   "dependencies": {
     "better-sqlite3": "^13.0.0",

@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db/database');
 const { requireRole, requireSampleAccess } = require('../middleware/auth');
-const { evaluateResult, RULE_PROFILES, getRuleProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
+const { evaluateResult, evaluateArchiveRow, RULE_PROFILES, getRuleProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
 
 const router = express.Router();
 
@@ -115,8 +115,9 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
            s.sampled_by AS sampledBy, s.created_at AS createdAt,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
-           r.afb1, r.afb2, r.afg1, r.afg2, r.ota,
+           r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
+           r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.review_status AS reviewStatus,
            vu.full_name AS validatedByName
@@ -149,10 +150,7 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
 
   let rows = db.prepare(query).all(...params);
 
-  let withStatus = rows.map(r => ({ ...r, status: evaluateResult({
-    afb1: r.afb1, afb2: r.afb2, afg1: r.afg1, afg2: r.afg2, ota: r.ota,
-    limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, qc_status: r.qcStatus
-  }) }));
+  let withStatus = rows.map(r => ({ ...r, status: evaluateArchiveRow(r) }));
 
   if (status) {
     withStatus = withStatus.filter(s => s.status === status);
@@ -179,8 +177,9 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
     SELECT s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
            s.sampled_by AS sampledBy,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
-           r.afb1, r.afb2, r.afg1, r.afg2, r.ota,
+           r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
+           r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.validation_status AS validationStatus, r.validated_at AS validatedAt,
            vu.full_name AS validatedByName
@@ -212,10 +211,7 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
   query += ' ORDER BY s.created_at DESC';
 
   let rows = db.prepare(query).all(...params);
-  rows = rows.map(r => ({ ...r, status: evaluateResult({
-    afb1: r.afb1, afb2: r.afb2, afg1: r.afg1, afg2: r.afg2, ota: r.ota,
-    limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, qc_status: r.qcStatus
-  }) }));
+  rows = rows.map(r => ({ ...r, status: evaluateArchiveRow(r) }));
 
   if (status) {
     rows = rows.filter(r => r.status === status);
@@ -236,7 +232,9 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
     'Cod probă', 'Denumire produs', 'Categorie', 'Data prelevării', 'Prelevat de',
     'Proprietar', 'Email proprietar', 'Firma',
     'AFB1 (µg/kg)', 'AFB2 (µg/kg)', 'AFG1 (µg/kg)', 'AFG2 (µg/kg)', 'OTA (µg/kg)',
+    'M1 (µg/kg)', 'DON (µg/kg)', 'ZEA (µg/kg)', 'Fumonizine (µg/kg)',
     'Limită AFB1', 'Limită sumă aflatoxine', 'Limită OTA',
+    'Limită M1', 'Limită DON', 'Limită ZEA', 'Limită Fumonizine',
     'Data analizei', 'Status', 'Observații'
   ];
 
@@ -246,7 +244,9 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
       csvEscape(r.code), csvEscape(r.productName), csvEscape(r.category), csvEscape(r.sampleDate), csvEscape(r.sampledBy),
       csvEscape(r.ownerName), csvEscape(r.ownerEmail), csvEscape(r.companyName),
       csvEscape(r.afb1), csvEscape(r.afb2), csvEscape(r.afg1), csvEscape(r.afg2), csvEscape(r.ota),
+      csvEscape(r.m1), csvEscape(r.don), csvEscape(r.zea), csvEscape(r.fum),
       csvEscape(r.limitAfb1), csvEscape(r.limitAflaSum), csvEscape(r.limitOta),
+      csvEscape(r.limitM1), csvEscape(r.limitDon), csvEscape(r.limitZea), csvEscape(r.limitFum),
       csvEscape(r.analysisDate), csvEscape(statusLabels[r.status] || r.status), csvEscape(r.notes)
     ].join(','));
   });

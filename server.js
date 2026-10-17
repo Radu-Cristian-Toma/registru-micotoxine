@@ -22,6 +22,7 @@ const { ensureCsrfToken, requireCsrf } = require('./middleware/csrf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const { HOST } = require('./config');
 
 // Security baseline for this stage of the project. These headers do not
 // replace a production reverse proxy/WAF/security policy, but reduce
@@ -82,22 +83,25 @@ app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Legare explicita pe 0.0.0.0 (toate interfetele de retea), nu doar
-// localhost - necesar ca telefonul sau alt dispozitiv din aceeasi retea
-// WiFi sa poata accesa aplicatia de pe laptop, pentru testare.
-app.listen(PORT, '0.0.0.0', () => {
+// Legare implicit pe 127.0.0.1 (doar local). Schimbarea se face explicit prin
+// variabila de mediu LIMS_HOST (vezi README) - de exemplu 0.0.0.0 pentru
+// acces din reteaua locala, doar in medii controlate.
+app.listen(PORT, HOST, () => {
   const os = require('os');
-  console.log(`Server pornit pe http://localhost:${PORT}`);
+  console.log(`Server pornit pe http://${HOST}:${PORT}`);
 
-  const interfaces = os.networkInterfaces();
-  const lanAddresses = [];
-  Object.values(interfaces).forEach(ifaceList => {
-    (ifaceList || []).forEach(iface => {
-      if (iface.family === 'IPv4' && !iface.internal) lanAddresses.push(iface.address);
+  if (HOST === '0.0.0.0' || HOST === '::') {
+    console.warn('ATENȚIE: serverul ascultă pe toate interfețele de rețea, iar aplicația folosește parole simple de test.');
+    const interfaces = os.networkInterfaces();
+    const lanAddresses = [];
+    Object.values(interfaces).forEach(ifaceList => {
+      (ifaceList || []).forEach(iface => {
+        if (iface.family === 'IPv4' && !iface.internal) lanAddresses.push(iface.address);
+      });
     });
-  });
-  if (lanAddresses.length) {
-    console.log('Accesibil din rețeaua locală (ex. telefon conectat la același WiFi) la:');
-    lanAddresses.forEach(addr => console.log(`  http://${addr}:${PORT}`));
+    if (lanAddresses.length) {
+      console.log('Accesibil din rețeaua locală la:');
+      lanAddresses.forEach(addr => console.log(`  http://${addr}:${PORT}`));
+    }
   }
 });

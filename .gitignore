@@ -4,3 +4,4 @@ db/lims.db
 db/lims.db-shm
 db/lims.db-wal
 *.log
+backup/

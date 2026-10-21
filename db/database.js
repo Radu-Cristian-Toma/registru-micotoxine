@@ -433,6 +433,26 @@ db.exec(`
   BEGIN SELECT RAISE(ABORT, 'result_versions este append-only: stergerea este interzisa'); END;
 `);
 
+// Etapa B4 (L6): instantaneul buletinului la emitere. Continutul emis ramane
+// fixat (JSON + SHA-256), independent de tabelele "vii"; append-only.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS bulletin_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_id INTEGER NOT NULL UNIQUE,
+    bulletin_no TEXT NOT NULL UNIQUE,
+    snapshot_json TEXT NOT NULL,
+    snapshot_hash TEXT NOT NULL,
+    issued_by INTEGER,
+    issued_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (sample_id) REFERENCES samples(id),
+    FOREIGN KEY (issued_by) REFERENCES users(id)
+  );
+  CREATE TRIGGER IF NOT EXISTS bulletin_snapshots_no_update BEFORE UPDATE ON bulletin_snapshots
+  BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS bulletin_snapshots_no_delete BEFORE DELETE ON bulletin_snapshots
+  BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: stergerea este interzisa'); END;
+`);
+
 const validationSeed = [
   ['VAL-01', 'Autentificare și control pe roluri', 'Acces', 'Un beneficiar nu poate accesa funcțiile operatorului sau administratorului.'],
   ['VAL-02', 'Înregistrare probă', 'Recepție', 'O probă nouă primește identificator unic și poate fi urmărită ulterior.'],
@@ -441,11 +461,13 @@ const validationSeed = [
   ['VAL-05', 'Blocare validare incompletă', 'Validare', 'Rezultatul incomplet sau QC neacceptat nu poate fi validat.'],
   ['VAL-06', 'Trasabilitatea modificării', 'Integritatea datelor', 'Un rezultat validat nu mai poate fi modificat; fiecare modificare a unui rezultat nevalidat se păstrează ca versiune în istoric (cu motiv și sumă de control SHA-256) și ca eveniment în jurnalul de audit.'],
   ['VAL-07', 'Lucrare neconformă', 'Calitate', 'Un caz de lucrare neconformă poate fi înregistrat și închis cu o decizie.'],
-  ['VAL-08', 'Buletin și verificare', 'Raportare', 'Un buletin validat poate fi verificat prin identificatorul QR fără expunerea rezultatelor publice.']
+  ['VAL-08', 'Buletin și verificare', 'Raportare', 'Un buletin validat poate fi verificat prin identificatorul QR; pagina publică confirmă autenticitatea (număr, date, amprentă SHA-256) fără a expune rezultatele analitice.']
 ];
 const insertValidation = db.prepare(`INSERT OR IGNORE INTO system_validation_tests (code,title,area,expected) VALUES (?,?,?,?)`);
 const seedValidation = db.transaction(() => validationSeed.forEach(row => insertValidation.run(...row)));
 seedValidation();
+db.prepare(`UPDATE system_validation_tests SET expected = ? WHERE code = 'VAL-08' AND expected = ?`)
+  .run(validationSeed.find(r => r[0] === 'VAL-08')[3], 'Un buletin validat poate fi verificat prin identificatorul QR fără expunerea rezultatelor publice.');
 // Textul VAL-06 a fost corectat (descria un comportament inexistent). INSERT OR
 // IGNORE nu actualizeaza randuri existente, deci inlocuim doar textul vechi
 // exact, fara sa atingem rezultatul sau nota testului.

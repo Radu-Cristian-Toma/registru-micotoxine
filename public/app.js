@@ -1476,6 +1476,8 @@ function renderBulletinReadOnly(sample) {
 
       <div class="section-hint" style="margin:8px 0;">${bt('bulletin.limitsBasis')}: ${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${escapeHtml(sample.limitSource || '')}${sample.limitRegulationRef ? ` — ${escapeHtml(sample.limitRegulationRef)}` : ''}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
 
+      ${sample.bulletinHash ? `<div class="section-hint mono" style="margin:4px 0;word-break:break-all;">${bt('bulletin.fingerprint')}: ${escapeHtml(sample.bulletinHash)}</div>` : ''}
+
       <div class="section-label">${bt('bulletin.operatorNotes')}</div>
       <div class="notes-area"><p class="readonly-notes">${sample.notes ? escapeHtml(sample.notes) : bt('bulletin.noNotes')}</p></div>
 

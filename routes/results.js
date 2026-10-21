@@ -4,6 +4,62 @@ const db = require('../db/database');
 const { requireRole, requireSampleAccess } = require('../middleware/auth');
 const { evaluateResult, evaluateArchiveRow, RULE_PROFILES, getRuleProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
 
+// --- Etapa B4: instantanee si versiuni ---------------------------------------
+const sha256 = (txt) => crypto.createHash('sha256').update(txt).digest('hex');
+
+// Starea unui rezultat, asa cum se pastreaza in result_versions (starea
+// DINAINTE de modificare). Un singur loc, ca PUT/validate/review sa nu divearga.
+function versionSnapshot(current) {
+  return {
+    afb1: current.afb1, afb2: current.afb2, afg1: current.afg1, afg2: current.afg2, ota: current.ota, m1: current.m1,
+    don: current.don, zea: current.zea, fum: current.fum,
+    limitAfb1: current.limit_afb1, limitAflaSum: current.limit_afla_sum, limitOta: current.limit_ota, limitM1: current.limit_m1,
+    limitDon: current.limit_don, limitZea: current.limit_zea, limitFum: current.limit_fum,
+    analysisDate: current.analysis_date, notes: current.notes, method: current.method, equipment: current.equipment, qcStatus: current.qc_status,
+    validationStatus: current.validation_status, bulletinNo: current.bulletin_no || null, bulletinIssuedAt: current.bulletin_issued_at || null,
+    reviewStatus: current.review_status || null,
+    limitProfileId: current.limit_profile_id || null, limitBasis: current.limit_basis || null, limitOverrideReason: current.limit_override_reason || null
+  };
+}
+
+function recordVersion(sampleId, current, reason, userId) {
+  const latest = db.prepare('SELECT COALESCE(MAX(version_no), 0) AS n FROM result_versions WHERE sample_id = ?').get(sampleId);
+  const json = JSON.stringify(versionSnapshot(current));
+  db.prepare(`INSERT INTO result_versions (sample_id, version_no, snapshot_json, snapshot_hash, change_reason, changed_by) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(sampleId, latest.n + 1, json, sha256(json), reason || null, userId);
+}
+
+// Continutul buletinului emis, fixat la momentul validarii. Imaginile
+// (logo, semnatura, stampila) se pastreaza doar ca amprenta SHA-256.
+function buildBulletinSnapshot(sampleId, userId) {
+  const row = db.prepare(`
+    SELECT r.*, s.code, s.product_name, s.category, s.sample_date, s.sampled_by, s.requested_tests
+    FROM results r JOIN samples s ON s.id = r.sample_id WHERE r.sample_id = ?`).get(sampleId);
+  const lab = db.prepare('SELECT * FROM lab_settings WHERE id = 1').get() || {};
+  const validator = db.prepare('SELECT id, full_name FROM users WHERE id = ?').get(userId) || {};
+  const imgHash = (v) => (v ? sha256(v) : null);
+  let requestedTests = null;
+  try { requestedTests = row.requested_tests ? JSON.parse(row.requested_tests) : null; } catch (_) { requestedTests = null; }
+  return {
+    schema: 1,
+    bulletinNo: row.bulletin_no, issuedAt: row.bulletin_issued_at,
+    sample: { code: row.code, productName: row.product_name, category: row.category, sampleDate: row.sample_date, sampledBy: row.sampled_by, requestedTests },
+    results: { afb1: row.afb1, afb2: row.afb2, afg1: row.afg1, afg2: row.afg2, ota: row.ota, m1: row.m1, don: row.don, zea: row.zea, fum: row.fum },
+    limits: { afb1: row.limit_afb1, aflaSum: row.limit_afla_sum, ota: row.limit_ota, m1: row.limit_m1, don: row.limit_don, zea: row.limit_zea, fum: row.limit_fum },
+    limitProvenance: { profileId: row.limit_profile_id, source: row.limit_source, regulationRef: row.limit_regulation_ref, basis: row.limit_basis, overrideReason: row.limit_override_reason },
+    analysis: { date: row.analysis_date, method: row.method, equipment: row.equipment, qcStatus: row.qc_status, notes: row.notes },
+    review: { status: row.review_status, reviewedBy: row.reviewed_by, reviewedAt: row.reviewed_at },
+    operatorId: row.operator_id,
+    validation: { validatedBy: validator.id || null, validatedByName: validator.full_name || null, validatedAt: row.validated_at },
+    laboratory: {
+      institutionName: lab.institution_name || null, institutionAddress: lab.institution_address || null,
+      institutionEmail: lab.institution_email || null, institutionPhone: lab.institution_phone || null,
+      signatureName: lab.signature_name || null, signatureRole: lab.signature_role || null,
+      logoSha256: imgHash(lab.logo_data_url), signatureSha256: imgHash(lab.signature_data_url), stampSha256: imgHash(lab.stamp_data_url)
+    }
+  };
+}
+
 const router = express.Router();
 
 // Reguli disponibile pentru aplicație. Nu presupun existența unui instrument.
@@ -52,7 +108,7 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
            s.is_control_sample AS isControlSample, s.operator_seen_state AS operatorSeenState,
            s.status, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.operator_id AS operatorId, r.review_status AS reviewStatus, r.reviewed_at AS reviewedAt, r.review_note AS reviewNote, ru.full_name AS reviewedByName,
@@ -117,7 +173,7 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
            s.sampled_by AS sampledBy, s.created_at AS createdAt,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
@@ -180,7 +236,7 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
            s.sampled_by AS sampledBy,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
@@ -391,21 +447,7 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
   const reason = String(correctionReason || '').trim() || null;
 
   const save = db.transaction(() => {
-    const snapshot = {
-      afb1: current.afb1, afb2: current.afb2, afg1: current.afg1, afg2: current.afg2, ota: current.ota, m1: current.m1,
-      don: current.don, zea: current.zea, fum: current.fum,
-      limitAfb1: current.limit_afb1, limitAflaSum: current.limit_afla_sum, limitOta: current.limit_ota, limitM1: current.limit_m1,
-      limitDon: current.limit_don, limitZea: current.limit_zea, limitFum: current.limit_fum,
-      analysisDate: current.analysis_date, notes: current.notes, method: current.method, equipment: current.equipment, qcStatus: current.qc_status,
-      validationStatus: current.validation_status, bulletinNo: current.bulletin_no || null, bulletinIssuedAt: current.bulletin_issued_at || null,
-      limitProfileId: current.limit_profile_id || null, limitBasis: current.limit_basis || null, limitOverrideReason: current.limit_override_reason || null
-    };
-    const latest = db.prepare('SELECT COALESCE(MAX(version_no), 0) AS n FROM result_versions WHERE sample_id = ?').get(req.params.sampleId);
-    const versionNo = latest.n + 1;
-    const snapshotJson = JSON.stringify(snapshot);
-    const hash = crypto.createHash('sha256').update(snapshotJson).digest('hex');
-    db.prepare(`INSERT INTO result_versions (sample_id, version_no, snapshot_json, snapshot_hash, change_reason, changed_by) VALUES (?, ?, ?, ?, ?, ?)` )
-      .run(req.params.sampleId, versionNo, snapshotJson, hash, reason, req.session.user.id);
+    recordVersion(req.params.sampleId, current, reason, req.session.user.id);
 
     db.prepare(`
     UPDATE results SET
@@ -553,10 +595,18 @@ router.post('/:sampleId/validate', requireRole('validator', 'admin'), requireSam
       if (m) next = Math.max(next, parseInt(m[1], 10) + 1);
     }
     const no = `BUL-${year}-${String(next).padStart(5, '0')}`;
+    recordVersion(req.params.sampleId, row, 'validare: emitere buletin', req.session.user.id);
     db.prepare(`UPDATE results SET validation_status = 'validated', validated_by = ?, validated_at = datetime('now', 'localtime'), bulletin_no = ?, bulletin_issued_at = datetime('now', 'localtime') WHERE sample_id = ?`)
       .run(req.session.user.id, no, req.params.sampleId);
     db.prepare(`INSERT INTO audit_log (sample_id, user_id, action, details) VALUES (?, ?, ?, ?)`)
       .run(req.params.sampleId, req.session.user.id, 'result_validated', JSON.stringify({ status: resultStatus, bulletinNo: no }));
+    const snap = buildBulletinSnapshot(req.params.sampleId, req.session.user.id);
+    const snapJson = JSON.stringify(snap);
+    const snapHash = sha256(snapJson);
+    db.prepare('INSERT INTO bulletin_snapshots (sample_id, bulletin_no, snapshot_json, snapshot_hash, issued_by) VALUES (?, ?, ?, ?, ?)')
+      .run(req.params.sampleId, no, snapJson, snapHash, req.session.user.id);
+    db.prepare(`INSERT INTO audit_log (sample_id, user_id, action, details) VALUES (?, ?, ?, ?)`)
+      .run(req.params.sampleId, req.session.user.id, 'bulletin_snapshot_stored', JSON.stringify({ bulletinNo: no, snapshotSha256: snapHash }));
     return no;
   })();
   res.json({ ok: true, validationStatus: 'validated', bulletinNo });
@@ -598,6 +648,7 @@ router.post('/:sampleId/review', requireRole('validator', 'admin'), requireSampl
     return res.status(400).json({ error: 'Rezultatele nu sunt complete încă — nu pot fi aprobate. Poți respinge proba pentru a o retrimite operatorului.' });
   }
 
+  recordVersion(req.params.sampleId, current, `revizuire: ${decision}`, req.session.user.id);
   db.prepare(`UPDATE results SET review_status = ?, reviewed_by = ?, reviewed_at = datetime('now', 'localtime'), review_note = ? WHERE sample_id = ?`)
     .run(decision, req.session.user.id, String(note || '').trim() || null, req.params.sampleId);
 
@@ -779,7 +830,7 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
            r.validation_status AS validationStatus, r.validated_at AS validatedAt,
            r.analysis_date AS analysisDate, r.method, r.equipment,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            s.code, s.product_name AS productName, s.category, s.status, s.requested_tests AS requestedTestsJson,
            u.full_name AS validatedByName
@@ -796,8 +847,19 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
   let requestedTests = null;
   try { requestedTests = row.requestedTestsJson ? JSON.parse(row.requestedTestsJson) : null; } catch (_) { requestedTests = null; }
 
+  // Pagina publica (QR) confirma doar autenticitatea buletinului: numar, date,
+  // amprenta SHA-256 a instantaneului emis. Rezultatele analitice NU sunt
+  // expuse public, decat daca laboratorul activeaza explicit
+  // LIMS_PUBLIC_VERIFY_RESULTS=1 (Etapa B4, L18).
+  const snap = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE bulletin_no = ?').get(row.bulletinNo);
+  const snapshotHash = snap ? snap.snapshot_hash : null;
+  if (process.env.LIMS_PUBLIC_VERIFY_RESULTS !== '1') {
+    return res.json({ bulletin: { detailLevel: 'minimal', bulletinNo: row.bulletinNo, issuedAt: row.issuedAt, validatedAt: row.validatedAt, snapshotHash } });
+  }
   res.json({
     bulletin: {
+      detailLevel: 'full',
+      snapshotHash,
       bulletinNo: row.bulletinNo,
       issuedAt: row.issuedAt,
       code: row.code,
@@ -819,6 +881,15 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
       }
     }
   });
+});
+
+// Instantaneul buletinului emis + verificarea amprentei (doar utilizatori
+// autentificati cu acces la proba).
+router.get('/:sampleId/bulletin-snapshot', requireRole('owner', 'operator', 'validator', 'admin'), requireSampleAccess('sampleId'), (req, res) => {
+  const row = db.prepare('SELECT snapshot_json, snapshot_hash, bulletin_no, issued_at FROM bulletin_snapshots WHERE sample_id = ?').get(req.params.sampleId);
+  if (!row) return res.status(404).json({ error: 'Pentru această probă nu există un instantaneu de buletin (nevalidată sau emisă înainte de introducerea instantaneelor).' });
+  const intact = sha256(row.snapshot_json) === row.snapshot_hash;
+  res.json({ bulletinNo: row.bulletin_no, issuedAt: row.issued_at, snapshotSha256: row.snapshot_hash, integrity: intact ? 'ok' : 'mismatch', snapshot: JSON.parse(row.snapshot_json) });
 });
 
 module.exports = router;

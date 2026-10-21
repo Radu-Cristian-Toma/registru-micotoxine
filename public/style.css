@@ -1624,3 +1624,6 @@ table.contaminants th .bulletin-en {
 .lab-pick .field label.checkbox-row, .lab-card .field label.checkbox-row, .intake-condition .field label.checkbox-row { font-size: 14px; text-transform: none; letter-spacing: 0; color: inherit; font-weight: 400; }
 .lab-line { margin: 5px 0; }
 .lab-line > div { margin-top: 1px; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.lab-card { margin-bottom: 28px; }
+.lab-card .checkbox-row { display: flex; gap: 8px; align-items: center; }

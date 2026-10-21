@@ -17,7 +17,7 @@ Teste noi (`test/unit/`): `limits-profiles`, `limits-provenance`, `audit-integri
 
 ## Neimplementat sau doar parțial
 
-- **Interfața pentru B5**: regula de decizie, LOQ, recuperarea și incertitudinea se introduc doar prin API (`methodPerformance`, `decisionRule` la `PUT /api/results/:id`); nu există câmpuri în formularul operatorului și nu apar pe buletinul tipărit. Fără ele, funcția nu este utilizabilă de operator.
+- **Interfața pentru B5** (adăugată ulterior, ramura `claude/etapa-b-ui-b5`): formularul operatorului are regula de decizie și, per grup comandat, LOQ, recuperare și incertitudine extinsă relativă; buletinul afișează regula, U, recuperarea și „<LOQ”. Verificată într-un browser (Chromium) pe o bază temporară cu date inventate: afișare, refuz fără motiv, salvare cu motiv, escapare HTML. Nu s-a verificat tipărirea buletinului și nici afișarea pe ecrane mici.
 - **Corecția pentru recuperare** nu este aplicată în calcul (se stochează doar valoarea). Tratarea „<LOQ” în suma aflatoxinelor (limita inferioară) nu este implementată; „<LOQ” este doar semnalat în detaliul de decizie.
 - **Buletinul afișat în interfață** este încă randat din tabelele curente; instantaneul este înregistrarea de referință. Semnătura și ștampila afișate sunt cele curente din setări (instantaneul le păstrează doar ca amprentă).
 - **Nu s-au abordat**: L10 (buletin corectat/retras), L11 (restaurare backup), L12 (retenție/export), L13 (controale QC), L14 (echipamente), L15 (date de prelevare/lot), L16 (starea probei la recepție), L17 (separarea rolurilor pentru admin), L19 (marcaje de timp), L20 (ștergerea valorilor prin COALESCE), L22 (unități/bază de calcul).

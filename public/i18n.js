@@ -393,6 +393,16 @@ const TRANSLATIONS = {
     'Cafea prăjită (boabe și măcinată)': 'Roasted coffee (beans and ground)',
     'Vin și alte băuturi pe bază de must de struguri': 'Wine and other grape-must-based beverages',
     'Lapte crud, lapte tratat termic și lapte pentru produse lactate': 'Raw milk, heat-treated milk, and milk for dairy products',
+    'Capsicum spp. uscat (boia, paprika, ardei iute, chilli, cayenne)': 'Dried Capsicum spp. (paprika, chilli, cayenne)',
+    'Produse de măcinare a cerealelor (făină, griș) pentru consumatorul final': 'Cereal milling products (flour, semolina) for the final consumer',
+    'Fructe de vită-de-vie uscate pentru consumatorul final (stafide, coarințe, sultanine)': 'Dried vine fruit (raisins, currants, sultanas) for the final consumer',
+    'Fructe de vită-de-vie uscate înainte de sortare / alt tratament fizic': 'Dried vine fruit before sorting / other physical treatment',
+    'Grâu dur neprocesat pentru prima etapă de procesare': 'Unprocessed durum wheat for the first processing stage',
+    'Ovăz neprocesat (cu pleavă) pentru prima etapă de procesare': 'Unprocessed oats (with husk) for the first processing stage',
+    'Semințe de floarea-soarelui, dovleac, pepene, cânepă și boabe de soia pentru consumatorul final': 'Sunflower, pumpkin, melon, hemp seeds and soybeans for the final consumer',
+    'Fistic înainte de sortare / tratament fizic': 'Pistachios before sorting / physical treatment',
+    'Fistic pentru consumatorul final': 'Pistachios for the final consumer',
+    'Cafea solubilă (instant)': 'Soluble (instant) coffee',
   },
   operator: {
     // renderOperatorApp

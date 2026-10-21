@@ -201,10 +201,80 @@ const RULE_PROFILES = [
     limit_afb1: null, limit_afla_sum: null, limit_ota: null, limit_m1: 0.050,
     // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.16 (aflatoxina M1)'
+  },
+  // ---- Etapa B (revizia 2 a auditului, L23/L24): profiluri adaugate dupa confruntarea cu Anexa I
+  // a Reg. (UE) 2023/915, versiunea consolidata 02023R0915-20250101. Verificat 21.10.2026 prin
+  // citirea paginii EUR-Lex (rezumat automat) - de reconfirmat de laborator pe textul oficial.
+  // Aceste profiluri sunt atinse prin eticheta exacta sau prin rafinarea din REFINEMENTS (mai jos).
+  {
+    id: 'cereal-milling-products',
+    label: 'Produse de măcinare a cerealelor (făină, griș) pentru consumatorul final',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 3.0,
+    limit_don: 600, limit_zea: 75, limit_fum: null,
+    source: 'Reg. (UE) 2023/915, Anexa I: AFB1/sumă pct. 1.1.12; OTA pct. 1.2.10; DON pct. 1.4.5 (produse de măcinare a cerealelor, exclusiv porumb și orez); ZEA pct. 1.5.3 (inclusiv făină și griș)'
+  },
+  {
+    id: 'dried-vine-fruit-final',
+    label: 'Fructe de vită-de-vie uscate pentru consumatorul final (stafide, coarințe, sultanine)',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 8.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.2 și 1.2.1.1 (fructe de vită-de-vie uscate: coarințe, stafide, sultanine)'
+  },
+  {
+    id: 'dried-vine-fruit-sorting',
+    label: 'Fructe de vită-de-vie uscate înainte de sortare / alt tratament fizic',
+    keywords: [],
+    limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 8.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.1 și 1.2.1.1'
+  },
+  {
+    id: 'durum-wheat-unprocessed',
+    label: 'Grâu dur neprocesat pentru prima etapă de procesare',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 5.0,
+    limit_don: 1500, limit_zea: 100, limit_fum: null,
+    source: 'Reg. (UE) 2023/915, Anexa I: AFB1/sumă pct. 1.1.12; OTA pct. 1.2.9; DON pct. 1.4.2 (grâu dur neprocesat); ZEA pct. 1.5.1'
+  },
+  {
+    id: 'oats-unprocessed',
+    label: 'Ovăz neprocesat (cu pleavă) pentru prima etapă de procesare',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 5.0,
+    limit_don: 1750, limit_zea: 100, limit_fum: null,
+    source: 'Reg. (UE) 2023/915, Anexa I: AFB1/sumă pct. 1.1.12; OTA pct. 1.2.9 (la ovăz, boabe cu pleavă); DON pct. 1.4.3 (ovăz neprocesat cu pleavă necomestibilă, pleava inclusă în măsurare); ZEA pct. 1.5.1'
+  },
+  {
+    id: 'oilseeds-ota-final',
+    label: 'Semințe de floarea-soarelui, dovleac, pepene, cânepă și boabe de soia pentru consumatorul final',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 5.0,
+    source: 'Reg. (UE) 2023/915, Anexa I: aflatoxine pct. 1.1.5 (arahide și alte semințe oleaginoase); OTA pct. 1.2.8'
+  },
+  {
+    id: 'pistachios-sorting',
+    label: 'Fistic înainte de sortare / tratament fizic',
+    keywords: [],
+    limit_afb1: 12.0, limit_afla_sum: 15.0, limit_ota: 10.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.8 (aflatoxine) și 1.2.3 (OTA)'
+  },
+  {
+    id: 'pistachios-final',
+    label: 'Fistic pentru consumatorul final',
+    keywords: [],
+    limit_afb1: 8.0, limit_afla_sum: 10.0, limit_ota: 5.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.9 (aflatoxine) și 1.2.4 (OTA)'
+  },
+  {
+    id: 'instant-coffee',
+    label: 'Cafea solubilă (instant)',
+    keywords: [],
+    limit_afb1: null, limit_afla_sum: null, limit_ota: 5.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.2.15'
   }
 ];
 
-function getRuleProfile(category = '', productName = '') {
+function baseGetRuleProfile(category = '', productName = '') {
   const text = `${category} ${productName}`.toLowerCase();
 
   // Verificare prioritara: daca textul contine eticheta EXACTA a unui profil
@@ -253,6 +323,39 @@ function getRuleProfile(category = '', productName = '') {
   }
 
   return null;
+}
+
+// Rafinari: cand profilul general ales (prin eticheta sau cuvinte-cheie) are o subcategorie cu
+// limite proprii in Anexa I, produsul numit explicit in text trece la profilul specific.
+// Exemple verificate: faina (DON 600, nu 750), stafide (OTA 8, nu 2), grau dur / ovaz neprocesat
+// (DON 1500 / 1750), semintele de floarea-soarelui etc. (OTA 5), fisticul (OTA 5 / 10),
+// cafeaua solubila (OTA 5). Sursa: Anexa I a Reg. (UE) 2023/915, vezi profilurile de mai sus.
+const REFINEMENTS = [
+  { from: ['cereals-final-consumer'], to: 'cereal-milling-products', keywords: ['făină', 'faina', 'farina', 'griș', 'gris', 'semolină', 'semolina'], unless: /porumb|orez/ },
+  { from: ['dried-fruit-final'], to: 'dried-vine-fruit-final', keywords: ['stafid', 'coarin', 'sultanin', 'struguri uscați', 'struguri uscati'] },
+  { from: ['dried-fruit-sorting'], to: 'dried-vine-fruit-sorting', keywords: ['stafid', 'coarin', 'sultanin', 'struguri uscați', 'struguri uscati'] },
+  { from: ['unprocessed-cereals'], to: 'durum-wheat-unprocessed', keywords: ['grâu dur', 'grau dur', 'durum'] },
+  { from: ['unprocessed-cereals'], to: 'oats-unprocessed', keywords: ['ovăz', 'ovaz'] },
+  { from: ['peanuts-oilseeds-final'], to: 'oilseeds-ota-final', keywords: ['floarea soarelui', 'floarea-soarelui', 'semințe de dovleac', 'seminte de dovleac', 'semințe de pepene', 'seminte de pepene', 'cânepă', 'canepa', 'soia'] },
+  { from: ['almonds-pistachios-apricot-sorting'], to: 'pistachios-sorting', keywords: ['fistic'], unless: /migdale|sâmbur|sambur|caise/ },
+  { from: ['almonds-pistachios-apricot-final'], to: 'pistachios-final', keywords: ['fistic'], unless: /migdale|sâmbur|sambur|caise/ },
+  { from: ['roasted-coffee'], to: 'instant-coffee', keywords: ['solubil', 'instant'] }
+];
+
+function getRuleProfile(category = '', productName = '') {
+  const text = `${category} ${productName}`.toLowerCase();
+  const profile = baseGetRuleProfile(category, productName);
+  for (const r of REFINEMENTS) {
+    // Rafinarea se aplica peste profilul general gasit sau, daca textul liber nu
+    // a dus la niciun profil general, direct pe cuvintele-cheie specifice.
+    if (profile && !r.from.includes(profile.id)) continue;
+    if (r.unless && r.unless.test(text)) continue;
+    if (r.keywords.some(k => text.includes(k))) {
+      const target = RULE_PROFILES.find(x => x.id === r.to);
+      if (target) return target;
+    }
+  }
+  return profile;
 }
 
 function evaluateResult(result) {

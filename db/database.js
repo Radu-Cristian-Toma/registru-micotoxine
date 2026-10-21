@@ -226,6 +226,112 @@ for (const col of ['decision_rule', 'method_performance_json']) {
   if (!resultsColumnsB5.includes(col)) db.exec(`ALTER TABLE results ADD COLUMN ${col} TEXT`);
 }
 
+// Etapa C3 (L16, L20, L22): starea probei la receptie si cine a receptionat-o,
+// baza de raportare (masa proaspata / substanta uscata) si continutul de substanta uscata.
+const resultsColumnsC3 = db.prepare(`PRAGMA table_info(results)`).all().map(c => c.name);
+if (!resultsColumnsC3.includes('intake_condition_json')) db.exec(`ALTER TABLE results ADD COLUMN intake_condition_json TEXT`);
+if (!resultsColumnsC3.includes('intake_checked_by')) db.exec(`ALTER TABLE results ADD COLUMN intake_checked_by INTEGER REFERENCES users(id)`);
+if (!resultsColumnsC3.includes('reporting_basis')) db.exec(`ALTER TABLE results ADD COLUMN reporting_basis TEXT`);
+if (!resultsColumnsC3.includes('dry_matter_pct')) db.exec(`ALTER TABLE results ADD COLUMN dry_matter_pct REAL`);
+// Etapa C4 (L15): datele probei la laborator (masa probei de laborator, omogenizare, replici).
+for (const col of ['lab_sample_mass_g REAL', 'homogenization TEXT', 'replicates INTEGER']) {
+  if (!resultsColumnsC3.includes(col.split(' ')[0])) db.exec(`ALTER TABLE results ADD COLUMN ${col}`);
+}
+// Etapa C4 (L14): echipamente si loturi de reactivi / materiale de referinta folosite (liste JSON de id-uri).
+for (const col of ['equipment_ids_json TEXT', 'reagent_lot_ids_json TEXT']) {
+  if (!resultsColumnsC3.includes(col.split(' ')[0])) db.exec(`ALTER TABLE results ADD COLUMN ${col}`);
+}
+
+db.exec(`
+  -- Etapa C3: o singura conventie pentru marcajele temporale (ora locala a serverului),
+  -- cu fusul orar inregistrat; schimbarea fusului este detectata de verify-integrity.
+  CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  -- Etapa C3 (L10): starea unui buletin emis (retras / inlocuit), append-only.
+  -- Buletinul initial si instantaneul lui nu se modifica; starea apare pe pagina publica si pe buletin.
+  CREATE TABLE IF NOT EXISTS bulletin_status_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_id INTEGER NOT NULL UNIQUE,
+    bulletin_no TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('withdrawn', 'superseded')),
+    reason TEXT NOT NULL,
+    replaced_by_sample_id INTEGER,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (sample_id) REFERENCES samples(id),
+    FOREIGN KEY (replaced_by_sample_id) REFERENCES samples(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  );
+  CREATE TRIGGER IF NOT EXISTS bulletin_status_events_no_update BEFORE UPDATE ON bulletin_status_events
+  BEGIN SELECT RAISE(ABORT, 'bulletin_status_events este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS bulletin_status_events_no_delete BEFORE DELETE ON bulletin_status_events
+  BEGIN SELECT RAISE(ABORT, 'bulletin_status_events este append-only: stergerea este interzisa'); END;
+
+  -- Etapa C4 (L14): registru de echipamente si de loturi de reactivi / materiale de referinta.
+  CREATE TABLE IF NOT EXISTS equipment (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    equipment_type TEXT,
+    serial_no TEXT,
+    location TEXT,
+    calibration_date TEXT,
+    calibration_due TEXT,
+    calibration_ref TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'retired')),
+    notes TEXT,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  );
+  CREATE TABLE IF NOT EXISTS reagent_lots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('reagent', 'reference_material', 'standard', 'kit')),
+    lot_no TEXT NOT NULL,
+    supplier TEXT,
+    expiry_date TEXT,
+    analyte_group TEXT,
+    certified_value REAL,
+    certified_u REAL,
+    unit TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'retired')),
+    notes TEXT,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  );
+
+  -- Etapa C4 (L13): rezultatele controalelor de calitate (material de referinta / proba de control).
+  CREATE TABLE IF NOT EXISTS qc_controls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analyte_group TEXT NOT NULL CHECK (analyte_group IN ('aflatoxins', 'ota', 'm1', 'don', 'zea', 'fum')),
+    reagent_lot_id INTEGER,
+    sample_id INTEGER,
+    measured_value REAL NOT NULL,
+    expected_value REAL NOT NULL,
+    accept_low_pct REAL NOT NULL,
+    accept_high_pct REAL NOT NULL,
+    recovery_pct REAL NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('pass', 'fail')),
+    notes TEXT,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (reagent_lot_id) REFERENCES reagent_lots(id),
+    FOREIGN KEY (sample_id) REFERENCES samples(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  );
+  CREATE TRIGGER IF NOT EXISTS qc_controls_no_update BEFORE UPDATE ON qc_controls
+  BEGIN SELECT RAISE(ABORT, 'qc_controls este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS qc_controls_no_delete BEFORE DELETE ON qc_controls
+  BEGIN SELECT RAISE(ABORT, 'qc_controls este append-only: stergerea este interzisa'); END;
+`);
+
 const sampleColumns = db.prepare(`PRAGMA table_info(samples)`).all().map(c => c.name);
 if (!sampleColumns.includes('haccp_intended_use')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_intended_use TEXT`);
 if (!sampleColumns.includes('haccp_hazard')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_hazard TEXT`);
@@ -242,6 +348,11 @@ if (!sampleColumns.includes('haccp_corrective_action')) db.exec(`ALTER TABLE sam
 // operator - nu doar categoria in sine, ca sa permita si comenzi partiale
 // (client care vrea doar o parte din analizele disponibile pentru categoria lui).
 if (!sampleColumns.includes('requested_tests')) db.exec(`ALTER TABLE samples ADD COLUMN requested_tests TEXT`);
+// Etapa C4 (L15): datele de prelevare declarate de beneficiar (dimensiunea lotului,
+// numarul de probe elementare, metoda / planul de prelevare). Laboratorul nu raspunde de prelevare.
+for (const col of ['lot_size_kg REAL', 'increments_count INTEGER', 'sampling_method TEXT']) {
+  if (!sampleColumns.includes(col.split(' ')[0])) db.exec(`ALTER TABLE samples ADD COLUMN ${col}`);
+}
 // Starea (status + validation_status) vazuta ultima oara de proprietar -
 // folosita pentru notificarea in-app "Nou" cand statusul probei s-a
 // schimbat de la ultima vizualizare, fara a necesita server de email.
@@ -392,6 +503,16 @@ if (!labSettingsColumns.includes('institution_email')) db.exec(`ALTER TABLE lab_
 // despre o proba, un beneficiar are nevoie de o cale directa de contact,
 // nu doar de statusul probei. Optional, alaturi de email.
 if (!labSettingsColumns.includes('institution_phone')) db.exec(`ALTER TABLE lab_settings ADD COLUMN institution_phone TEXT`);
+// Etapa C3 (L17): separarea sarcinilor. Implicit strict: administratorul nu introduce
+// rezultate si nu valideaza, iar cine a aprobat o proba nu o si valideaza.
+if (!labSettingsColumns.includes('strict_roles')) db.exec(`ALTER TABLE lab_settings ADD COLUMN strict_roles INTEGER NOT NULL DEFAULT 1`);
+// Etapa C4 (L12): politica de retentie a dosarelor (ani) si interval maxim de la ultimul control QC (zile; 0 = fara avertisment).
+if (!labSettingsColumns.includes('retention_years')) db.exec(`ALTER TABLE lab_settings ADD COLUMN retention_years INTEGER`);
+if (!labSettingsColumns.includes('qc_max_age_days')) db.exec(`ALTER TABLE lab_settings ADD COLUMN qc_max_age_days INTEGER NOT NULL DEFAULT 7`);
+
+// Etapa C3 (L19): fusul orar al serverului la prima pornire; marcajele temporale sunt ora locala a acestuia.
+db.prepare(`INSERT OR IGNORE INTO app_meta (key, value) VALUES ('timestamp_convention', 'local-server-time')`).run();
+db.prepare(`INSERT OR IGNORE INTO app_meta (key, value) VALUES ('server_timezone', ?)`).run(Intl.DateTimeFormat().resolvedOptions().timeZone || 'necunoscut');
 
 // Etapa B3 (L7, L8): jurnalul de audit si istoricul versiunilor devin
 // append-only la nivel de baza de date, iar evenimentele fara proba (conturi,
@@ -458,6 +579,19 @@ db.exec(`
   BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: modificarea este interzisa'); END;
   CREATE TRIGGER IF NOT EXISTS bulletin_snapshots_no_delete BEFORE DELETE ON bulletin_snapshots
   BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: stergerea este interzisa'); END;
+
+  -- Etapa C2: imaginile (logo, semnatura, stampila) folosite la emiterea unui buletin,
+  -- adresate prin amprenta SHA-256 din instantaneu, ca buletinul emis sa poata fi
+  -- redat identic si dupa schimbarea setarilor laboratorului.
+  CREATE TABLE IF NOT EXISTS branding_assets (
+    sha256 TEXT PRIMARY KEY,
+    data_url TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+  CREATE TRIGGER IF NOT EXISTS branding_assets_no_update BEFORE UPDATE ON branding_assets
+  BEGIN SELECT RAISE(ABORT, 'branding_assets este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS branding_assets_no_delete BEFORE DELETE ON branding_assets
+  BEGIN SELECT RAISE(ABORT, 'branding_assets este append-only: stergerea este interzisa'); END;
 `);
 
 const validationSeed = [

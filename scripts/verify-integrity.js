@@ -46,9 +46,20 @@ function verify(db) {
     warnings.push({ type: 'snapshot_missing', sampleId: r.sample_id, bulletinNo: r.bulletin_no });
   }
   const triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger'`).all().map(t => t.name);
-  for (const t of ['audit_log_no_update', 'audit_log_no_delete', 'result_versions_no_update', 'result_versions_no_delete', 'bulletin_snapshots_no_update', 'bulletin_snapshots_no_delete']) {
+  for (const t of ['audit_log_no_update', 'audit_log_no_delete', 'result_versions_no_update', 'result_versions_no_delete', 'bulletin_snapshots_no_update', 'bulletin_snapshots_no_delete',
+    'bulletin_status_events_no_update', 'bulletin_status_events_no_delete', 'qc_controls_no_update', 'qc_controls_no_delete', 'branding_assets_no_update', 'branding_assets_no_delete']) {
     if (!triggers.includes(t)) problems.push({ type: 'trigger_missing', name: t });
   }
+  // Etapa C2/C3: imaginile de antet (adresate prin SHA-256), starea buletinelor si fusul orar.
+  for (const a of db.prepare('SELECT sha256, data_url FROM branding_assets').all()) {
+    if (crypto.createHash('sha256').update(a.data_url).digest('hex') !== a.sha256) problems.push({ type: 'branding_asset_hash_mismatch', sha256: a.sha256 });
+  }
+  for (const e of db.prepare('SELECT e.sample_id, e.bulletin_no, r.bulletin_no AS actual FROM bulletin_status_events e LEFT JOIN results r ON r.sample_id = e.sample_id').all()) {
+    if (e.actual !== e.bulletin_no) problems.push({ type: 'status_event_bulletin_mismatch', sampleId: e.sample_id, bulletinNo: e.bulletin_no });
+  }
+  const tz = db.prepare(`SELECT value FROM app_meta WHERE key = 'server_timezone'`).get();
+  const nowTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (tz && tz.value !== nowTz) warnings.push({ type: 'timezone_changed', recorded: tz.value, current: nowTz });
   return { versionsChecked: rows.length, snapshotsChecked, problems, warnings };
 }
 

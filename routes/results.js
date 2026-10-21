@@ -1,6 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db/database');
+const { strictRoles } = require('../db/policy');
+const { bulletinLifecycle, attachBulletinLifecycle } = require('../db/bulletin-state');
 const { requireRole, requireSampleAccess } = require('../middleware/auth');
 const { evaluateResult, evaluateArchiveRow, decisionDetail, DECISION_RULES, PERFORMANCE_GROUPS, RULE_PROFILES, getRuleProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
 
@@ -19,7 +21,22 @@ function versionSnapshot(current) {
     validationStatus: current.validation_status, bulletinNo: current.bulletin_no || null, bulletinIssuedAt: current.bulletin_issued_at || null,
     reviewStatus: current.review_status || null,
     decisionRule: current.decision_rule || null, methodPerformanceJson: current.method_performance_json || null,
-    limitProfileId: current.limit_profile_id || null, limitBasis: current.limit_basis || null, limitOverrideReason: current.limit_override_reason || null
+    limitProfileId: current.limit_profile_id || null, limitBasis: current.limit_basis || null, limitOverrideReason: current.limit_override_reason || null,
+    intakeConditionJson: current.intake_condition_json || null, intakeCheckedBy: current.intake_checked_by || null,
+    reportingBasis: current.reporting_basis || null, dryMatterPct: current.dry_matter_pct ?? null,
+    labSampleMassG: current.lab_sample_mass_g ?? null, homogenization: current.homogenization || null, replicates: current.replicates ?? null,
+    equipmentIdsJson: current.equipment_ids_json || null, reagentLotIdsJson: current.reagent_lot_ids_json || null
+  };
+}
+
+// Echipamentele si loturile folosite, asa cum erau in registru la emiterea buletinului.
+function traceabilityDetail(row) {
+  const ids = (json) => { try { const a = json ? JSON.parse(json) : []; return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+  const eq = db.prepare('SELECT id, code, name, equipment_type AS type, serial_no AS serialNo, calibration_date AS calibrationDate, calibration_due AS calibrationDue, calibration_ref AS calibrationRef FROM equipment WHERE id = ?');
+  const lot = db.prepare('SELECT id, code, name, kind, lot_no AS lotNo, supplier, expiry_date AS expiryDate, analyte_group AS analyteGroup, certified_value AS certifiedValue, certified_u AS certifiedU, unit FROM reagent_lots WHERE id = ?');
+  return {
+    equipment: ids(row.equipment_ids_json).map(id => eq.get(id)).filter(Boolean),
+    lots: ids(row.reagent_lot_ids_json).map(id => lot.get(id)).filter(Boolean)
   };
 }
 
@@ -31,14 +48,17 @@ function recordVersion(sampleId, current, reason, userId) {
 }
 
 // Continutul buletinului emis, fixat la momentul validarii. Imaginile
-// (logo, semnatura, stampila) se pastreaza doar ca amprenta SHA-256.
+// (logo, semnatura, stampila) apar in instantaneu ca amprenta SHA-256, iar
+// continutul lor se pastreaza in branding_assets (append-only).
 function buildBulletinSnapshot(sampleId, userId) {
   const row = db.prepare(`
-    SELECT r.*, s.code, s.product_name, s.category, s.sample_date, s.sampled_by, s.requested_tests
+    SELECT r.*, s.code, s.product_name, s.category, s.sample_date, s.sampled_by, s.requested_tests,
+           s.lot_size_kg, s.increments_count, s.sampling_method
     FROM results r JOIN samples s ON s.id = r.sample_id WHERE r.sample_id = ?`).get(sampleId);
   const lab = db.prepare('SELECT * FROM lab_settings WHERE id = 1').get() || {};
   const validator = db.prepare('SELECT id, full_name FROM users WHERE id = ?').get(userId) || {};
-  const imgHash = (v) => (v ? sha256(v) : null);
+  const insertAsset = db.prepare('INSERT OR IGNORE INTO branding_assets (sha256, data_url) VALUES (?, ?)');
+  const imgHash = (v) => { if (!v) return null; const h = sha256(v); insertAsset.run(h, v); return h; };
   let requestedTests = null;
   try { requestedTests = row.requested_tests ? JSON.parse(row.requested_tests) : null; } catch (_) { requestedTests = null; }
   return {
@@ -50,6 +70,11 @@ function buildBulletinSnapshot(sampleId, userId) {
     limitProvenance: { profileId: row.limit_profile_id, source: row.limit_source, regulationRef: row.limit_regulation_ref, basis: row.limit_basis, overrideReason: row.limit_override_reason },
     analysis: { date: row.analysis_date, method: row.method, equipment: row.equipment, qcStatus: row.qc_status, notes: row.notes },
     decision: decisionDetail(row),
+    reportingBasis: row.reporting_basis || 'as_is', dryMatterPct: row.dry_matter_pct ?? null,
+    intake: (() => { try { return row.intake_condition_json ? JSON.parse(row.intake_condition_json) : null; } catch (_) { return null; } })(),
+    labSample: { massG: row.lab_sample_mass_g ?? null, homogenization: row.homogenization || null, replicates: row.replicates ?? null },
+    samplingDeclared: { lotSizeKg: row.lot_size_kg ?? null, incrementsCount: row.increments_count ?? null, samplingMethod: row.sampling_method || null },
+    traceability: traceabilityDetail(row),
     review: { status: row.review_status, reviewedBy: row.reviewed_by, reviewedAt: row.reviewed_at },
     operatorId: row.operator_id,
     validation: { validatedBy: validator.id || null, validatedByName: validator.full_name || null, validatedAt: row.validated_at },
@@ -105,7 +130,7 @@ router.get('/stats/intake-time', requireRole('admin'), (req, res) => {
 
 router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) => {
   const rows = db.prepare(`
-    SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate, s.sampled_by AS sampledBy,
+    SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate, s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod,
            s.requested_tests AS requestedTestsJson, s.due_date AS dueDate, s.retest_of_sample_id AS retestOfSampleId, orig.code AS retestOfCode,
            s.is_control_sample AS isControlSample, s.operator_seen_state AS operatorSeenState,
            s.status, s.created_at AS createdAt, ow.company_name AS companyName,
@@ -114,7 +139,7 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.operator_id AS operatorId, r.review_status AS reviewStatus, r.reviewed_at AS reviewedAt, r.review_note AS reviewNote, ru.full_name AS reviewedByName,
-           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName
+           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName, r.intake_condition_json AS intakeConditionJson, r.reporting_basis AS reportingBasis, r.dry_matter_pct AS dryMatterPct, r.lab_sample_mass_g AS labSampleMassG, r.homogenization, r.replicates, r.equipment_ids_json AS equipmentIdsJson, r.reagent_lot_ids_json AS reagentLotIdsJson
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     LEFT JOIN users ru ON ru.id = r.reviewed_by
@@ -140,7 +165,7 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
     return { ...rest, requestedTests, status: computedStatus, hasUpdate };
   });
 
-  res.json({ samples: withStatus });
+  res.json({ samples: attachBulletinLifecycle(withStatus) });
 });
 
 // Marcheaza proba ca vazuta de operator/validator - sterge notificarea "Nou"
@@ -174,7 +199,7 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
 
   let query = `
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
-           s.sampled_by AS sampledBy, s.created_at AS createdAt,
+           s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod, s.created_at AS createdAt,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
@@ -182,7 +207,7 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.review_status AS reviewStatus,
-           vu.full_name AS validatedByName
+           vu.full_name AS validatedByName, r.intake_condition_json AS intakeConditionJson, r.reporting_basis AS reportingBasis, r.dry_matter_pct AS dryMatterPct, r.lab_sample_mass_g AS labSampleMassG, r.homogenization, r.replicates, r.equipment_ids_json AS equipmentIdsJson, r.reagent_lot_ids_json AS reagentLotIdsJson
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     LEFT JOIN users u ON u.id = s.owner_id
@@ -228,7 +253,7 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const paged = withStatus.slice((page - 1) * pageSize, page * pageSize);
 
-  res.json({ samples: paged, total, page, pageSize });
+  res.json({ samples: attachBulletinLifecycle(paged), total, page, pageSize });
 });
 
 // Export CSV al arhivei operatorului, cu aceleasi filtre.
@@ -237,7 +262,7 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
 
   let query = `
     SELECT s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
-           s.sampled_by AS sampledBy,
+           s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
@@ -245,7 +270,7 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.validation_status AS validationStatus, r.validated_at AS validatedAt,
-           vu.full_name AS validatedByName
+           vu.full_name AS validatedByName, r.intake_condition_json AS intakeConditionJson, r.reporting_basis AS reportingBasis, r.dry_matter_pct AS dryMatterPct, r.lab_sample_mass_g AS labSampleMassG, r.homogenization, r.replicates, r.equipment_ids_json AS equipmentIdsJson, r.reagent_lot_ids_json AS reagentLotIdsJson
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     LEFT JOIN users u ON u.id = s.owner_id
@@ -321,9 +346,92 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
   res.send(csvContent);
 });
 
+// --- Etapa C3/C4: campuri suplimentare ale rezultatului ------------------------
+const VALUE_FIELDS = ['afb1', 'afb2', 'afg1', 'afg2', 'ota', 'm1', 'don', 'zea', 'fum'];
+const INTAKE_PACKAGING = ['intact', 'damaged', 'opened'];
+const isTrue = (v) => v === true || v === 'true' || v === 1 || v === '1' || v === 'on';
+const trimTo = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
+const optNum = (v) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+
+// Valideaza si normalizeaza campurile C3/C4 din corpul cererii PUT. Returneaza
+// { error } sau { extras } (undefined = campul nu se modifica).
+function parseExtras(body, current) {
+  const x = {};
+  if (body.intakeCondition !== undefined && body.intakeCondition !== null) {
+    const c = body.intakeCondition;
+    if (typeof c !== 'object' || Array.isArray(c) || !INTAKE_PACKAGING.includes(c.packaging)) {
+      return { error: 'Starea probei la recepție: ambalajul trebuie să fie „intact”, „deteriorat” sau „deschis”.' };
+    }
+    const t = optNum(c.temperatureC);
+    if (t !== undefined && (!Number.isFinite(t) || t < -80 || t > 80)) return { error: 'Temperatura la recepție trebuie să fie un număr între −80 și 80 °C.' };
+    const cond = { packaging: c.packaging, quantityAdequate: isTrue(c.quantityAdequate), transport: trimTo(c.transport, 200), notes: trimTo(c.notes, 300) };
+    if (t !== undefined) cond.temperatureC = t;
+    x.intakeConditionJson = JSON.stringify(cond);
+  } else if (isTrue(body.intakeConfirmed) && !current.intake_condition_json) {
+    // Receptie confirmata fara descrierea starii: se inregistreaza explicit ca neinregistrata.
+    x.intakeConditionJson = JSON.stringify({ packaging: 'not_recorded' });
+    x.intakeConditionMissing = true;
+  }
+  if (body.reportingBasis !== undefined && body.reportingBasis !== null && body.reportingBasis !== '') {
+    if (!['as_is', 'dry_matter'].includes(body.reportingBasis)) return { error: 'Baza de raportare trebuie să fie „as_is” (masă proaspătă) sau „dry_matter” (substanță uscată).' };
+    x.reportingBasis = body.reportingBasis;
+  }
+  const dm = optNum(body.dryMatterPct);
+  if (dm !== undefined) {
+    if (!Number.isFinite(dm) || dm <= 0 || dm > 100) return { error: 'Conținutul de substanță uscată trebuie să fie între 0 (exclusiv) și 100 %.' };
+    x.dryMatterPct = dm;
+  }
+  const mass = optNum(body.labSampleMassG);
+  if (mass !== undefined) {
+    if (!Number.isFinite(mass) || mass <= 0) return { error: 'Masa probei de laborator trebuie să fie un număr pozitiv (g).' };
+    x.labSampleMassG = mass;
+  }
+  if (body.homogenization !== undefined && body.homogenization !== null && String(body.homogenization).trim() !== '') x.homogenization = trimTo(body.homogenization, 300);
+  const rep = optNum(body.replicates);
+  if (rep !== undefined) {
+    if (!Number.isInteger(rep) || rep < 1 || rep > 20) return { error: 'Numărul de replici trebuie să fie un întreg între 1 și 20.' };
+    x.replicates = rep;
+  }
+  for (const [field, key] of [['equipmentIds', 'equipmentIds'], ['reagentLotIds', 'reagentLotIds']]) {
+    if (body[field] === undefined || body[field] === null) continue;
+    const arr = body[field];
+    if (!Array.isArray(arr) || arr.length > 20 || arr.some(n => !Number.isInteger(n) || n <= 0)) return { error: `Lista ${field} trebuie să conțină cel mult 20 de identificatori numerici.` };
+    x[key] = [...new Set(arr)];
+  }
+  return { extras: x };
+}
+
+// Echipamentele si loturile alese trebuie sa existe si sa fie active; la trimiterea spre validare,
+// calibrarea trebuie sa fie valabila la data analizei si loturile neexpirate. Date comparate ca text ISO (AAAA-LL-ZZ).
+function checkTraceability(equipmentIds, lotIds, analysisDate, enforceDates) {
+  const eq = db.prepare('SELECT * FROM equipment WHERE id = ?');
+  const lot = db.prepare('SELECT * FROM reagent_lots WHERE id = ?');
+  for (const id of equipmentIds || []) {
+    const e = eq.get(id);
+    if (!e) return `Echipamentul cu id ${id} nu există în registru.`;
+    if (e.status !== 'active') return `Echipamentul ${e.code} este scos din uz.`;
+    if (enforceDates) {
+      if (!e.calibration_due) return `Echipamentul ${e.code} nu are scadența calibrării înregistrată.`;
+      if (analysisDate && String(analysisDate).slice(0, 10) > e.calibration_due) return `Echipamentul ${e.code} are calibrarea expirată la data analizei (scadență ${e.calibration_due}).`;
+    }
+  }
+  for (const id of lotIds || []) {
+    const l = lot.get(id);
+    if (!l) return `Lotul cu id ${id} nu există în registru.`;
+    if (l.status !== 'active') return `Lotul ${l.code} este scos din uz.`;
+    if (enforceDates && l.expiry_date && analysisDate && String(analysisDate).slice(0, 10) > l.expiry_date) return `Lotul ${l.code} este expirat la data analizei (expiră ${l.expiry_date}).`;
+  }
+  return null;
+}
+
 // Operatorul introduce/actualizeaza rezultatele pentru o proba anume.
 router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('sampleId'), (req, res) => {
   const { afb1, afb2, afg1, afg2, ota, m1, don, zea, fum, analysisDate, notes, method, equipment, qcStatus, qcRejectionReason, intakeConfirmed, limitAfb1, limitAflaSum, limitOta, limitM1, limitDon, limitZea, limitFum, correctionReason, limitChangeReason, decisionRule, methodPerformance } = req.body;
+
+  // L17: cu separarea sarcinilor activa, administratorul nu introduce rezultate.
+  if (req.session.user.role === 'admin' && strictRoles()) {
+    return res.status(403).json({ error: 'Separarea sarcinilor este activă: administratorul nu introduce rezultate. O poți relaxa din setările de calitate (cu jurnalizare).' });
+  }
 
   const sample = db.prepare('SELECT id, requested_tests AS requestedTestsJson FROM samples WHERE id = ?').get(req.params.sampleId);
   if (!sample) return res.status(404).json({ error: 'Proba nu a fost găsită.' });
@@ -375,12 +483,41 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
         }
         clean[group][field] = n;
       }
+      if (vals.corrected !== undefined && vals.corrected !== null && vals.corrected !== '') {
+        const on = vals.corrected === true || vals.corrected === 'true' || vals.corrected === 1 || vals.corrected === '1' || vals.corrected === 'on';
+        if (on) {
+          if (clean[group].recoveryPct === undefined) {
+            return res.status(400).json({ error: `Corecția pentru recuperare la grupul ${group} cere o recuperare (%) validă.` });
+          }
+          clean[group].corrected = true;
+        }
+      }
     }
     performanceJson = JSON.stringify(clean);
   }
   const storedRule = DECISION_RULES.includes(current.decision_rule) ? current.decision_rule : 'simple';
   const effectiveDecisionRule = decisionRule ? decisionRule : storedRule;
   const effectivePerformanceJson = performanceJson !== null ? performanceJson : (current.method_performance_json || null);
+
+  // Etapa C3/C4: stare la receptie, baza de raportare, date de laborator, echipamente / loturi.
+  const parsedExtras = parseExtras(req.body, current);
+  if (parsedExtras.error) return res.status(400).json({ error: parsedExtras.error });
+  const extras = parsedExtras.extras;
+
+  // L20: retragerea trasabila a unei valori introduse gresit (altfel COALESCE permite doar suprascrierea).
+  const clearList = Array.isArray(req.body.clearFields) ? [...new Set(req.body.clearFields)] : [];
+  const clearReasonText = String(req.body.clearReason || '').trim();
+  if (clearList.length) {
+    if (clearList.some(k => !VALUE_FIELDS.includes(k))) return res.status(400).json({ error: 'Câmp necunoscut în lista valorilor de retras.' });
+    if (!clearReasonText) return res.status(400).json({ error: 'Retragerea unei valori introduse necesită un motiv scris (câmpul „Motivul retragerii”).' });
+    for (const k of clearList) {
+      const incoming = req.body[k];
+      if (incoming !== undefined && incoming !== null && incoming !== '') return res.status(400).json({ error: `Valoarea ${k} nu poate fi simultan introdusă și retrasă.` });
+      if (current[k] === null || current[k] === undefined) return res.status(400).json({ error: `Valoarea ${k} nu este introdusă, deci nu poate fi retrasă.` });
+    }
+  }
+  const curView = { ...current };
+  for (const k of clearList) curView[k] = null;
 
   // QC respins anuleaza proba - beneficiarul trebuie sa vada de ce, nu doar
   // "ceva s-a schimbat". Motivul e obligatoriu, nu optional.
@@ -437,8 +574,8 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
   if (effectiveQcStatus === 'accepted' || effectiveQcStatus === 'not_required') {
     const pick = (masked, currentVal) => { const n = toNum(masked); return (masked !== undefined && masked !== null && masked !== '') ? n : currentVal; };
     const effectiveStatus = evaluateResult({
-      afb1: pick(maskedAfb1, current.afb1), afb2: pick(maskedAfb2, current.afb2), afg1: pick(maskedAfg1, current.afg1), afg2: pick(maskedAfg2, current.afg2),
-      ota: pick(maskedOta, current.ota), m1: pick(maskedM1, current.m1), don: pick(maskedDon, current.don), zea: pick(maskedZea, current.zea), fum: pick(maskedFum, current.fum),
+      afb1: pick(maskedAfb1, curView.afb1), afb2: pick(maskedAfb2, curView.afb2), afg1: pick(maskedAfg1, curView.afg1), afg2: pick(maskedAfg2, curView.afg2),
+      ota: pick(maskedOta, curView.ota), m1: pick(maskedM1, curView.m1), don: pick(maskedDon, curView.don), zea: pick(maskedZea, curView.zea), fum: pick(maskedFum, curView.fum),
       limit_afb1: pick(maskedLimitAfb1, current.limit_afb1), limit_afla_sum: pick(maskedLimitAflaSum, current.limit_afla_sum), limit_ota: pick(maskedLimitOta, current.limit_ota),
       limit_m1: pick(maskedLimitM1, current.limit_m1), limit_don: pick(maskedLimitDon, current.limit_don), limit_zea: pick(maskedLimitZea, current.limit_zea), limit_fum: pick(maskedLimitFum, current.limit_fum),
       qc_status: effectiveQcStatus,
@@ -464,6 +601,19 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
     }
   }
 
+  // Echipamente / loturi din registru: exista, sunt active si, la trimiterea spre validare,
+  // calibrarea este valabila si loturile nu sunt expirate la data analizei (L14).
+  {
+    const submitting = effectiveQcStatus === 'accepted' || effectiveQcStatus === 'not_required';
+    let eqIds = extras.equipmentIds; let lotIds = extras.reagentLotIds;
+    const parseIds = (json) => { try { const a = json ? JSON.parse(json) : []; return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+    if (eqIds === undefined) eqIds = parseIds(current.equipment_ids_json);
+    if (lotIds === undefined) lotIds = parseIds(current.reagent_lot_ids_json);
+    const effDate = analysisDate !== undefined && analysisDate !== null && analysisDate !== '' ? analysisDate : current.analysis_date;
+    const problem = checkTraceability(eqIds, lotIds, effDate, submitting);
+    if (problem) return res.status(400).json({ error: problem });
+  }
+
   // L5: orice modificare manuala a unei limite fata de valoarea stocata (inclusiv
   // setarea unei limite inca necompletate) cere un motiv scris; motivul, baza
   // 'manual' si valorile vechi/noi raman in rezultat si in jurnalul de audit.
@@ -478,9 +628,14 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
     if (n !== null && n !== stored) limitChanges[key] = { from: stored ?? null, to: n };
   }
   const limitReasonText = String(limitChangeReason || '').trim();
-  const ruleChanged = effectiveDecisionRule !== storedRule;
+  const correctedSet = (json) => {
+    let p = null; try { p = json ? JSON.parse(json) : null; } catch (_) { p = null; }
+    return Object.keys(p || {}).filter(g => p[g] && p[g].corrected === true).sort().join(',');
+  };
+  const correctionChanged = correctedSet(effectivePerformanceJson) !== correctedSet(current.method_performance_json);
+  const ruleChanged = effectiveDecisionRule !== storedRule || correctionChanged;
   if (ruleChanged && !limitReasonText) {
-    return res.status(400).json({ error: 'Schimbarea regulii de decizie modifică verdictul de conformitate și necesită un motiv scris (câmpul „Motivul modificării limitelor”).' });
+    return res.status(400).json({ error: 'Schimbarea regulii de decizie sau a corecției pentru recuperare modifică verdictul de conformitate și necesită un motiv scris (câmpul „Motivul modificării limitelor”).' });
   }
   if (Object.keys(limitChanges).length && !limitReasonText) {
     return res.status(400).json({ error: 'Modificarea manuală a limitelor legale necesită un motiv scris (câmpul „Motivul modificării limitelor”).' });
@@ -524,6 +679,25 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
     req.params.sampleId
   );
 
+  // Campurile C3/C4 (UPDATE separat, ca sa nu se amestece parametrii pozitionali de mai sus).
+  db.prepare(`
+    UPDATE results SET
+      intake_condition_json = COALESCE(?, intake_condition_json),
+      intake_checked_by = COALESCE(intake_checked_by, CASE WHEN ? = 1 THEN ? ELSE NULL END),
+      reporting_basis = COALESCE(?, reporting_basis), dry_matter_pct = COALESCE(?, dry_matter_pct),
+      lab_sample_mass_g = COALESCE(?, lab_sample_mass_g), homogenization = COALESCE(?, homogenization), replicates = COALESCE(?, replicates),
+      equipment_ids_json = COALESCE(?, equipment_ids_json), reagent_lot_ids_json = COALESCE(?, reagent_lot_ids_json)
+    WHERE sample_id = ?
+  `).run(
+    extras.intakeConditionJson ?? null, intakeConfirmed ? 1 : 0, req.session.user.id,
+    extras.reportingBasis ?? null, extras.dryMatterPct ?? null,
+    extras.labSampleMassG ?? null, extras.homogenization ?? null, extras.replicates ?? null,
+    extras.equipmentIds !== undefined ? JSON.stringify(extras.equipmentIds) : null,
+    extras.reagentLotIds !== undefined ? JSON.stringify(extras.reagentLotIds) : null,
+    req.params.sampleId
+  );
+  for (const k of clearList) db.prepare(`UPDATE results SET ${k} = NULL WHERE sample_id = ?`).run(req.params.sampleId);
+
   const updated = db.prepare(`
     SELECT afb1, afb2, afg1, afg2, ota, m1, don, zea, fum, decision_rule AS decisionRule, method_performance_json AS methodPerformanceJson, limit_afb1 AS limitAfb1,
            limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
@@ -544,8 +718,13 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
     results: { afb1: updated.afb1, afb2: updated.afb2, afg1: updated.afg1, afg2: updated.afg2, ota: updated.ota, m1: updated.m1, don: updated.don, zea: updated.zea, fum: updated.fum },
     limits: { afb1: updated.limitAfb1, aflaSum: updated.limitAflaSum, ota: updated.limitOta, m1: updated.limitM1, don: updated.limitDon, zea: updated.limitZea, fum: updated.limitFum },
     decisionRule: effectiveDecisionRule,
-    decisionRuleChanged: ruleChanged ? { from: storedRule, to: effectiveDecisionRule, reason: limitReasonText } : undefined,
+    decisionRuleChanged: ruleChanged ? { from: storedRule, to: effectiveDecisionRule, correctionChanged, reason: limitReasonText } : undefined,
     methodPerformance: performanceJson !== null ? JSON.parse(performanceJson) : undefined,
+    intakeCondition: extras.intakeConditionJson ? { ...JSON.parse(extras.intakeConditionJson), recorded: !extras.intakeConditionMissing } : undefined,
+    clearedValues: clearList.length ? { fields: clearList, reason: clearReasonText, previous: Object.fromEntries(clearList.map(k => [k, current[k]])) } : undefined,
+    reportingBasis: extras.reportingBasis, dryMatterPct: extras.dryMatterPct,
+    labSample: (extras.labSampleMassG !== undefined || extras.homogenization !== undefined || extras.replicates !== undefined) ? { massG: extras.labSampleMassG, homogenization: extras.homogenization, replicates: extras.replicates } : undefined,
+    equipmentIds: extras.equipmentIds, reagentLotIds: extras.reagentLotIds,
     limitProfileId: current.limit_profile_id || null,
     limitBasis: Object.keys(limitChanges).length ? 'manual' : (current.limit_basis || null),
     limitChanges: Object.keys(limitChanges).length ? { changes: limitChanges, reason: limitReasonText } : undefined,
@@ -616,6 +795,15 @@ router.post('/:sampleId/validate', requireRole('validator', 'admin'), requireSam
   if (row.review_status !== 'approved') {
     return res.status(400).json({ error: 'Rezultatele trebuie aprobate de un coleg (revizuire independentă) înainte de validare.' });
   }
+  // L17: separarea sarcinilor — cine a aprobat proba nu o si valideaza, iar administratorul nu valideaza.
+  if (strictRoles()) {
+    if (req.session.user.role === 'admin') {
+      return res.status(403).json({ error: 'Separarea sarcinilor este activă: administratorul nu validează rezultate. O poți relaxa din setările de calitate (cu jurnalizare).' });
+    }
+    if (row.reviewed_by && row.reviewed_by === req.session.user.id) {
+      return res.status(403).json({ error: 'Separarea sarcinilor este activă: validatorul care a aprobat proba nu o poate și valida. Validarea o face un alt validator.' });
+    }
+  }
   const bulletinNo = db.transaction(() => {
     // Probele de control (fara client real) NU primesc numar de buletin din
     // secventa clientilor - ar strica trasabilitatea numerotarii la un audit
@@ -675,6 +863,9 @@ router.post('/:sampleId/review', requireRole('validator', 'admin'), requireSampl
   }
   if (current.operator_id && current.operator_id === req.session.user.id) {
     return res.status(403).json({ error: 'Nu poți aproba propriile rezultate introduse — este nevoie de un coleg diferit pentru revizuire.' });
+  }
+  if (req.session.user.role === 'admin' && strictRoles()) {
+    return res.status(403).json({ error: 'Separarea sarcinilor este activă: administratorul nu aprobă rezultate. O poți relaxa din setările de calitate (cu jurnalizare).' });
   }
   const resultStatus = evaluateResult(current);
   // O proba trebuie sa fi fost trimisa oficial de operator (QC decis) inainte
@@ -901,12 +1092,16 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
   // LIMS_PUBLIC_VERIFY_RESULTS=1 (Etapa B4, L18).
   const snap = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE bulletin_no = ?').get(row.bulletinNo);
   const snapshotHash = snap ? snap.snapshot_hash : null;
+  const sampleRow = db.prepare('SELECT sample_id FROM results WHERE bulletin_no = ?').get(row.bulletinNo);
+  const lc = bulletinLifecycle(sampleRow.sample_id);
+  const lifecycle = { state: lc.state, reason: lc.reason || null, at: lc.at || null, replacedByBulletinNo: lc.replacedByBulletinNo || null };
   if (process.env.LIMS_PUBLIC_VERIFY_RESULTS !== '1') {
-    return res.json({ bulletin: { detailLevel: 'minimal', bulletinNo: row.bulletinNo, issuedAt: row.issuedAt, validatedAt: row.validatedAt, snapshotHash } });
+    return res.json({ bulletin: { detailLevel: 'minimal', bulletinNo: row.bulletinNo, issuedAt: row.issuedAt, validatedAt: row.validatedAt, snapshotHash, lifecycle } });
   }
   res.json({
     bulletin: {
       detailLevel: 'full',
+      lifecycle,
       snapshotHash,
       bulletinNo: row.bulletinNo,
       issuedAt: row.issuedAt,
@@ -938,6 +1133,38 @@ router.get('/:sampleId/bulletin-snapshot', requireRole('owner', 'operator', 'val
   if (!row) return res.status(404).json({ error: 'Pentru această probă nu există un instantaneu de buletin (nevalidată sau emisă înainte de introducerea instantaneelor).' });
   const intact = sha256(row.snapshot_json) === row.snapshot_hash;
   res.json({ bulletinNo: row.bulletin_no, issuedAt: row.issued_at, snapshotSha256: row.snapshot_hash, integrity: intact ? 'ok' : 'mismatch', snapshot: JSON.parse(row.snapshot_json) });
+});
+
+// Antetul si semnatura asa cum au fost la emiterea buletinului (din instantaneu
+// si din branding_assets), nu cele curente din setarile laboratorului.
+router.get('/:sampleId/issued-branding', requireRole('owner', 'operator', 'validator', 'admin'), requireSampleAccess('sampleId'), (req, res) => {
+  const row = db.prepare('SELECT snapshot_json FROM bulletin_snapshots WHERE sample_id = ?').get(req.params.sampleId);
+  if (!row) return res.status(404).json({ error: 'Nu există instantaneu de buletin pentru această probă.' });
+  const lab = (JSON.parse(row.snapshot_json).laboratory) || {};
+  const current = db.prepare('SELECT logo_data_url, signature_data_url, stamp_data_url FROM lab_settings WHERE id = 1').get() || {};
+  const getAsset = db.prepare('SELECT data_url FROM branding_assets WHERE sha256 = ?');
+  let partial = false;
+  const resolve = (hash, currentValue) => {
+    if (!hash) return null;
+    const a = getAsset.get(hash);
+    if (a) return a.data_url;
+    // Buletine emise inainte de C2: imaginea se poate recupera doar daca este inca cea curenta.
+    if (currentValue && sha256(currentValue) === hash) {
+      db.prepare('INSERT OR IGNORE INTO branding_assets (sha256, data_url) VALUES (?, ?)').run(hash, currentValue);
+      return currentValue;
+    }
+    partial = true;
+    return null;
+  };
+  res.json({
+    institutionName: lab.institutionName || null, institutionAddress: lab.institutionAddress || null,
+    institutionEmail: lab.institutionEmail || null, institutionPhone: lab.institutionPhone || null,
+    signatureName: lab.signatureName || null, signatureRole: lab.signatureRole || null,
+    logoDataUrl: resolve(lab.logoSha256, current.logo_data_url),
+    signatureDataUrl: resolve(lab.signatureSha256, current.signature_data_url),
+    stampDataUrl: resolve(lab.stampSha256, current.stamp_data_url),
+    partial
+  });
 });
 
 module.exports = router;

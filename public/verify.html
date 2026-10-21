@@ -98,6 +98,16 @@ async function loadVerification() {
   const bulletinNo = decodeURIComponent(parts[parts.length - 1] || '');
   const content = document.getElementById('content');
 
+  // Starea buletinului (retras / înlocuit) apare în bannerul de sus; buletinul autentic valabil rămâne verde.
+  function statusBanner(b) {
+    const lc = b.lifecycle || { state: 'valid' };
+    if (lc.state === 'withdrawn' || lc.state === 'superseded') {
+      const text = lc.state === 'withdrawn' ? bt('verify.lifecycleWithdrawn') : `${bt('verify.lifecycleSuperseded')} <strong>${escapeHtml(lc.replacedByBulletinNo || '—')}</strong>.`;
+      return `<div class="verify-status-banner invalid"><span class="icon">!</span><div>${text}<br><span class="section-hint"><strong>${t('verify.lifecycleReason')}:</strong> ${escapeHtml(lc.reason || '—')} · ${escapeHtml(lc.at || '')}</span></div></div>`;
+    }
+    return `<div class="verify-status-banner valid"><span class="icon">✓</span><div>${bt('verify.authenticIssuedAt')} ${escapeHtml(b.issuedAt || '—')}.</div></div>`;
+  }
+
   if (!bulletinNo) {
     content.innerHTML = `<div class="verify-status-banner invalid"><span class="icon">✕</span><div>${bt('verify.noBulletinNumber')}</div></div>`;
     return;
@@ -122,10 +132,7 @@ async function loadVerification() {
     if (b.detailLevel === 'minimal') {
       document.getElementById('footer-note').textContent = '';
       content.innerHTML = `
-        <div class="verify-status-banner valid">
-          <span class="icon">✓</span>
-          <div>${bt('verify.authenticIssuedAt')} ${escapeHtml(b.issuedAt || '—')}.</div>
-        </div>
+        ${statusBanner(b)}
         <div class="bulletin">
           <div class="field-grid">
             <div class="field"><label>${bt('verify.bulletinNumberShort')}</label><div class="field-static">${escapeHtml(b.bulletinNo)}</div></div>
@@ -140,10 +147,7 @@ async function loadVerification() {
     const isFail = b.status === 'fail';
 
     content.innerHTML = `
-      <div class="verify-status-banner valid">
-        <span class="icon">✓</span>
-        <div>${bt('verify.authenticIssuedAt')} ${escapeHtml(b.issuedAt || '—')}.</div>
-      </div>
+      ${statusBanner(b)}
 
       <div class="bulletin">
         <div class="bulletin-head">

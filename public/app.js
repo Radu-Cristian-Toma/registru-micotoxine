@@ -32,12 +32,13 @@ function renderEditableExtraToxinRow(sample, key, label, hint, step) {
   const val = sample[key];
   const limitKey = 'limit' + key.charAt(0).toUpperCase() + key.slice(1); // don -> limitDon
   const limit = sample[limitKey];
-  const isOver = limit !== null && limit !== undefined && val !== null && val !== undefined && val > limit;
+  const verdict = sampleVerdict(sample, key, val, limit);
+  const isOver = verdict === 'non_conform';
   const flagId = `f-limit${key.charAt(0).toUpperCase() + key.slice(1)}`;
   let flag = '<span class="result-flag empty">—</span>';
   if (val !== null && val !== undefined) {
     if (limit === null || limit === undefined) flag = `<span class="result-flag empty">${t('operator.noLimitFlag')}</span>`;
-    else flag = isOver ? `<span class="result-flag fail">${t('operator.flagExceeded')}</span>` : `<span class="result-flag ok">${t('operator.flagConform')}</span>`;
+    else flag = verdictFlagHtml(verdict, false);
   }
   return `
     <tr class="extra-toxin-row">
@@ -242,15 +243,15 @@ function availableGroupsForProfileClient(profile) {
   return groups;
 }
 
-function renderReadOnlyExtraToxinRow(label, value, limit, hint, forceShow) {
+function renderReadOnlyExtraToxinRow(label, value, limit, hint, forceShow, sample, key) {
   const hasAny = (value !== null && value !== undefined) || (limit !== null && limit !== undefined);
   if (!hasAny && !forceShow) return '';
-  const isOver = limit !== null && limit !== undefined && value !== null && value !== undefined && value > limit;
+  const verdict = sampleVerdict(sample, key, value, limit);
   const flag = (value === null || value === undefined)
     ? `<span class="result-flag empty">${t('common.pending')}</span>`
     : (limit === null || limit === undefined)
       ? `<span class="result-flag empty">${bt('bulletin.limitNotSet')}</span>`
-      : (isOver ? `<span class="result-flag fail">${bt('common.exceeded')}</span>` : `<span class="result-flag ok">${bt('common.conform')}</span>`);
+      : verdictFlagHtml(verdict, true);
   return `
     <tr class="extra-toxin-row">
       <td class="name-cell" style="padding-left:28px;">${label} ${hint ? `<span class="section-hint">${hint}</span>` : ''}</td>
@@ -269,6 +270,25 @@ function parsePerformanceJson(sample) {
   catch (_) { return {}; }
 }
 
+// Verdict pe analit după regula de decizie a probei: același cod ca pe server
+// (public/decision-core.js), ca ecranul să nu difere de verdictul stocat.
+function sampleVerdict(sample, key, value, limit, ov) {
+  const rule = (ov && ov.rule) || (sample && sample.decisionRule === 'reg_2782_u' ? 'reg_2782_u' : 'simple');
+  const perf = (ov && ov.perf) || parsePerformanceJson(sample);
+  return window.DecisionCore.assess(key, value === undefined ? null : value, limit, rule, perf).verdict;
+}
+function sampleAflaSum(sample, ov) {
+  const perf = (ov && ov.perf) || parsePerformanceJson(sample);
+  const r = window.DecisionCore.aflatoxinSum(sample, perf);
+  return r ? r.sum : null;
+}
+function verdictFlagHtml(verdict, bulletin) {
+  if (verdict === 'non_conform') return `<span class="result-flag fail">${bulletin ? bt('common.exceeded') : t('operator.flagExceeded')}</span>`;
+  if (verdict === 'within_uncertainty') return `<span class="result-flag warn">${bulletin ? bt('common.withinUncertainty') : t('operator.flagWithinUncertainty')}</span>`;
+  if (verdict === 'conform') return `<span class="result-flag ok">${bulletin ? bt('common.conform') : t('operator.flagConform')}</span>`;
+  return '<span class="result-flag empty">—</span>';
+}
+
 function performanceFormHtml(sample) {
   const perf = parsePerformanceJson(sample);
   const requested = sample.requestedTests || TEST_GROUP_DEFS.map(g => g.key);
@@ -280,6 +300,7 @@ function performanceFormHtml(sample) {
         <td><input type="number" step="any" min="0" data-perf-group="${g.key}" data-perf-field="loq" value="${val(g.key, 'loq')}" aria-label="LOQ ${g.key}"></td>
         <td><input type="number" step="any" min="0" max="200" data-perf-group="${g.key}" data-perf-field="recoveryPct" value="${val(g.key, 'recoveryPct')}" aria-label="${t('operator.perfRecovery')} ${g.key}"></td>
         <td><input type="number" step="any" min="0" max="99.99" data-perf-group="${g.key}" data-perf-field="uRelPct" value="${val(g.key, 'uRelPct')}" aria-label="U ${g.key}"></td>
+        <td style="text-align:center;"><input type="checkbox" data-perf-group="${g.key}" data-perf-field="corrected" ${perf[g.key] && perf[g.key].corrected === true ? 'checked' : ''} aria-label="${t('operator.perfCorrected')} ${g.key}"></td>
       </tr>`).join('');
   return `
     <div class="field" style="grid-column:1 / -1;">
@@ -290,7 +311,7 @@ function performanceFormHtml(sample) {
       </select>
       <div class="section-hint">${t('operator.decisionRuleHint')}</div>
       <table class="contaminants" style="margin-top:8px;">
-        <thead><tr><th>${t('operator.perfGroup')}</th><th>${t('operator.perfLoq')}</th><th>${t('operator.perfRecovery')}</th><th>${t('operator.perfUncertainty')}</th></tr></thead>
+        <thead><tr><th>${t('operator.perfGroup')}</th><th>${t('operator.perfLoq')}</th><th>${t('operator.perfRecovery')}</th><th>${t('operator.perfUncertainty')}</th><th>${t('operator.perfCorrected')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="section-hint">${t('operator.perfHint')}</div>
@@ -304,8 +325,9 @@ function collectPerformancePayload() {
   if (!ruleEl) return {};
   const methodPerformance = {};
   document.querySelectorAll('[data-perf-group]').forEach(inp => {
-    if (inp.value === '') return;
     const g = inp.dataset.perfGroup;
+    if (inp.dataset.perfField === 'corrected') { if (inp.checked) (methodPerformance[g] = methodPerformance[g] || {}).corrected = true; return; }
+    if (inp.value === '') return;
     (methodPerformance[g] = methodPerformance[g] || {})[inp.dataset.perfField] = inp.value;
   });
   return { decisionRule: ruleEl.value, methodPerformance };
@@ -322,13 +344,24 @@ function performanceBulletinHtml(sample) {
     const p = perf[g];
     const bits = [];
     if (p.uRelPct !== undefined) bits.push(`U = ±${p.uRelPct}% (k = 2)`);
-    if (p.recoveryPct !== undefined) bits.push(`${bt('bulletin.recovery')} ${p.recoveryPct}%`);
+    if (p.recoveryPct !== undefined) bits.push(`${bt('bulletin.recovery')} ${p.recoveryPct}% (${p.corrected === true ? bt('bulletin.recoveryCorrected') : bt('bulletin.recoveryNotCorrected')})`);
     if (p.loq !== undefined) {
       bits.push(`LOQ ${p.loq}`);
       const vals = (valueOf[g] || []).filter(v => v !== null && v !== undefined);
       if (vals.some(v => v < p.loq)) bits.push("&lt;LOQ");
     }
-    return `${escapeHtml(g)}: ${bits.join(', ')}`;
+    if (g === 'aflatoxins' && p.loq !== undefined) bits.push(bt('bulletin.lowerBoundNote'));
+    if (p.corrected === true) {
+      const keys = { aflatoxins: ['afb1', 'aflaSum'], ota: ['ota'], m1: ['m1'], don: ['don'], zea: ['zea'], fum: ['fum'] }[g] || [];
+      const used = keys.map(k => {
+        const measured = k === 'aflaSum' ? sampleAflaSum(sample) : sample[k];
+        if (measured === null || measured === undefined) return null;
+        const a = window.DecisionCore.assess(k, measured, null, 'simple', perf);
+        return `${k === 'aflaSum' ? 'Σ' : k.toUpperCase()} ${Number(a.effective).toFixed(2)}`;
+      }).filter(Boolean);
+      if (used.length) bits.push(`${bt('bulletin.valueUsed')}: ${used.join(', ')}`);
+    }
+    return `${escapeHtml(g)}: ${bits.join('; ')}`;
   });
   const ruleText = rule === 'reg_2782_u' ? bt('bulletin.ruleReg2782') : bt('bulletin.ruleSimple');
   return `<div class="section-hint" style="margin:6px 0;">${bt('bulletin.decisionRule')}: ${ruleText}${parts.length ? `<br>${parts.join('<br>')}` : ''}</div>`;
@@ -1215,6 +1248,7 @@ async function renderOwnerDetail() {
             <label for="ns-sampledBy">${t('owner.sampledBy')}</label>
             <input type="text" id="ns-sampledBy" placeholder="${t('owner.sampledByPh')}">
           </div>
+          ${samplingFieldsHtml()}
           <div class="field">
             <label for="ns-sampleDate">${t('owner.sampleDate')}</label>
             <input type="date" id="ns-sampleDate" required>
@@ -1314,6 +1348,7 @@ async function renderOwnerDetail() {
             category,
             requestedTests,
             sampledBy: document.getElementById('ns-sampledBy').value.trim(),
+            ...collectSamplingFields(),
             sampleDate: document.getElementById('ns-sampleDate').value,
             requestedDueDate: document.getElementById('ns-dueDate').value,
             samplingAttested: document.getElementById('ns-sampling-attest').checked,
@@ -1365,7 +1400,8 @@ async function renderOwnerDetail() {
   });
   const trendBtn = document.getElementById('btn-show-trend');
   if (trendBtn) trendBtn.addEventListener('click', () => loadOwnerTrend(sample));
-  if (sample.bulletinNo) loadBulletinQr(sample.id);
+  if (sample.bulletinNo) { loadBulletinQr(sample.id); loadIssuedBranding(sample); }
+  loadBulletinLab(sample);
   loadTrendAlert(sample);
 }
 
@@ -1409,17 +1445,11 @@ function renderBulletinPendingCard(sample) {
   return `<div class="bulletin-pending-card"><span class="eyebrow">${t('owner.bulletinPendingEyebrow')}</span><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div>`;
 }
 
-function renderBulletinReadOnly(sample) {
-  const afVals = ['afb1', 'afb2', 'afg1', 'afg2'].map(k => sample[k]);
-  const afAllEntered = afVals.every(v => v !== null && v !== undefined);
-  const afSum = afAllEntered ? afVals.reduce((a, b) => a + b, 0) : null;
-  const b = labBranding || {};
-  const institutionName = b.institutionName || 'USAMV București · Facultatea de Biotehnologii · Laborator analize contaminanți';
+const issuedBrandingCache = {};
 
+function bulletinBrandHtml(sample, b) {
+  const institutionName = b.institutionName || 'USAMV București · Facultatea de Biotehnologii · Laborator analize contaminanți';
   return `
-    <div class="bulletin">
-      <div class="bulletin-head">
-        <div class="bulletin-head-with-logo">
           ${b.logoDataUrl ? `<img class="bulletin-logo-img" src="${b.logoDataUrl}" alt="Logo laborator">` : ''}
           <div>
             <h1>${bt('bulletin.title')} — ${escapeHtml(sample.code)}</h1>
@@ -1428,9 +1458,45 @@ function renderBulletinReadOnly(sample) {
             ${b.institutionEmail ? `<div class="institution">${escapeHtml(b.institutionEmail)}</div>` : ''}
             ${sample.bulletinNo ? `<div class="bulletin-no mono">${bt('bulletin.bulletinNumber')} ${escapeHtml(sample.bulletinNo)} · ${bt('bulletin.issuedOn')} ${escapeHtml(sample.bulletinIssuedAt || '')}</div><div id="bulletin-qr-slot" class="bulletin-qr"></div>` : ''}
           </div>
-        </div>
+  `;
+}
+
+function bulletinSignatureHtml(sample, b) {
+  return sample.bulletinNo && (b.signatureDataUrl || b.signatureName || b.stampDataUrl) ? `
+
+      <div class="bulletin-signature-block">
+        ${b.signatureDataUrl ? `<img class="bulletin-sig-img" src="${b.signatureDataUrl}" alt="${t('bulletin.signatureAltReal')}">` : ''}
+        ${b.stampDataUrl ? `<img class="bulletin-stamp-img" src="${b.stampDataUrl}" alt="${t('bulletin.stampAltReal')}">` : ''}
+        ${b.signatureName ? `<div class="bulletin-sig-name">${escapeHtml(b.signatureName)}${b.signatureRole ? ` · ${escapeHtml(b.signatureRole)}` : ''}</div>` : ''}
+        <div class="section-hint">${bt('bulletin.simpleSignatureNote')}</div>
+      </div>` : '';
+}
+
+// Antetul și semnătura buletinului emis, așa cum au fost la emitere (instantaneu),
+// nu cele curente din setări. Înlocuiește în loc conținutul afișat.
+async function loadIssuedBranding(sample) {
+  if (!sample.bulletinNo) return;
+  try {
+    if (!issuedBrandingCache[sample.id]) issuedBrandingCache[sample.id] = await api(`/results/${sample.id}/issued-branding`);
+    const b = issuedBrandingCache[sample.id];
+    const brand = document.getElementById('bulletin-brand-slot');
+    const sig = document.getElementById('bulletin-signature-slot');
+    if (brand) { brand.innerHTML = bulletinBrandHtml(sample, b); loadBulletinQr(sample.id); }
+    if (sig) sig.innerHTML = bulletinSignatureHtml(sample, b) + (b.partial ? `<div class="section-hint">${bt('bulletin.brandingPartial')}</div>` : '');
+  } catch (_) {}
+}
+
+function renderBulletinReadOnly(sample) {
+  const afSum = sampleAflaSum(sample);
+  const b = (sample.bulletinNo && issuedBrandingCache[sample.id]) || labBranding || {};
+
+  return `
+    <div class="bulletin">
+      <div class="bulletin-head">
+        <div class="bulletin-head-with-logo" id="bulletin-brand-slot">${bulletinBrandHtml(sample, b)}</div>
         <div class="verdict ${sample.status}">${statusLabel(sample.status, true)}</div>
       </div>
+      <div id="bulletin-lifecycle-slot">${lifecycleBannerHtml(sample.bulletinLifecycle)}</div>
       <div id="trend-alert-slot"></div>
 
       <div class="field-grid">
@@ -1470,11 +1536,11 @@ function renderBulletinReadOnly(sample) {
               if (!hasTest('aflatoxins') && !hasVal) return; // analiza necomandata si fara date
               const limitKey = row.key === 'afb1' ? 'limitAfb1' : null;
               const limit = limitKey ? sample[limitKey] : null;
-              const isOver = limit !== null && hasVal && val > limit;
+              const verdict = sampleVerdict(sample, row.key, val, limit);
               let flag = `<span class="result-flag empty">${t('common.pending')}</span>`;
               if (hasVal) {
                 if (limit === null) flag = `<span class="result-flag empty">${bt('bulletin.noLimit')}</span>`;
-                else flag = isOver ? `<span class="result-flag fail">${bt('common.exceeded')}</span>` : `<span class="result-flag ok">${bt('common.conform')}</span>`;
+                else flag = verdictFlagHtml(verdict, true);
               }
               rows += `
                 <tr>
@@ -1494,7 +1560,7 @@ function renderBulletinReadOnly(sample) {
                   <td class="name-cell">${bt('bulletin.aflatoxinSum')}</td>
                   <td class="mono">${afSum !== null ? afSum.toFixed(2) : '—'}</td>
                   <td class="limit-cell mono">${sample.limitAflaSum ?? '—'}</td>
-                  <td>${afSum !== null && sample.limitAflaSum !== null && afSum > sample.limitAflaSum ? `<span class="result-flag fail">${bt('common.exceeded')}</span>` : afSum !== null ? `<span class="result-flag ok">${bt('common.conform')}</span>` : `<span class="result-flag empty">${t('common.pending')}</span>`}</td>
+                  <td>${afSum !== null ? verdictFlagHtml(sampleVerdict(sample, 'aflaSum', afSum, sample.limitAflaSum), true) : `<span class="result-flag empty">${t('common.pending')}</span>`}</td>
                 </tr>
               `;
             }
@@ -1505,10 +1571,10 @@ function renderBulletinReadOnly(sample) {
             const otaHasVal = otaVal !== null && otaVal !== undefined;
             if (hasTest('ota') || otaHasVal) {
               const limit = sample.limitOta;
-              const isOver = limit !== null && otaHasVal && otaVal > limit;
+              const verdict = sampleVerdict(sample, 'ota', otaVal, limit);
               let flag = `<span class="result-flag empty">${t('common.pending')}</span>`;
               if (otaHasVal) {
-                flag = isOver ? `<span class="result-flag fail">${bt('common.exceeded')}</span>` : `<span class="result-flag ok">${bt('common.conform')}</span>`;
+                flag = verdictFlagHtml(verdict, true);
               }
               rows += `
                 <tr class="ota-row">
@@ -1525,9 +1591,9 @@ function renderBulletinReadOnly(sample) {
             const m1HasVal = sample.m1 !== null && sample.m1 !== undefined;
             const m1HasLimit = sample.limitM1 !== null && sample.limitM1 !== undefined;
             if (hasTest('m1') || m1HasVal || m1HasLimit) {
-              const isOver = m1HasLimit && m1HasVal && sample.m1 > sample.limitM1;
+              const verdict = sampleVerdict(sample, 'm1', sample.m1, sample.limitM1);
               let flag = `<span class="result-flag empty">${t('common.pending')}</span>`;
-              if (m1HasVal) flag = isOver ? `<span class="result-flag fail">${bt('common.exceeded')}</span>` : `<span class="result-flag ok">${bt('common.conform')}</span>`;
+              if (m1HasVal) flag = verdictFlagHtml(verdict, true);
               rows += `
                 <tr class="m1-row">
                   <td class="name-cell" style="padding-left:28px;">${bt('bulletin.aflatoxinM1Name')} <span class="section-hint">${bt('bulletin.milkOnly')}</span></td>
@@ -1538,9 +1604,9 @@ function renderBulletinReadOnly(sample) {
               `;
             }
 
-            rows += renderReadOnlyExtraToxinRow(bt('bulletin.donName'), sample.don, sample.limitDon, bt('bulletin.fusariumToxins'), hasTest('don'));
-            rows += renderReadOnlyExtraToxinRow(bt('bulletin.zeaName'), sample.zea, sample.limitZea, bt('bulletin.fusariumToxins'), hasTest('zea'));
-            rows += renderReadOnlyExtraToxinRow(bt('bulletin.fumName'), sample.fum, sample.limitFum, bt('bulletin.fusariumMaize'), hasTest('fum'));
+            rows += renderReadOnlyExtraToxinRow(bt('bulletin.donName'), sample.don, sample.limitDon, bt('bulletin.fusariumToxins'), hasTest('don'), sample, 'don');
+            rows += renderReadOnlyExtraToxinRow(bt('bulletin.zeaName'), sample.zea, sample.limitZea, bt('bulletin.fusariumToxins'), hasTest('zea'), sample, 'zea');
+            rows += renderReadOnlyExtraToxinRow(bt('bulletin.fumName'), sample.fum, sample.limitFum, bt('bulletin.fusariumMaize'), hasTest('fum'), sample, 'fum');
 
             return rows;
           })()}
@@ -1552,16 +1618,11 @@ function renderBulletinReadOnly(sample) {
       ${performanceBulletinHtml(sample)}
       ${sample.bulletinHash ? `<div class="section-hint" style="margin:4px 0;"><div><strong>${bt('bulletin.fingerprint')}</strong></div><div class="mono" style="word-break:break-all;">${escapeHtml(sample.bulletinHash)}</div></div>` : ''}
 
+      <div id="bulletin-lab-slot"></div>
       <div class="section-label">${bt('bulletin.operatorNotes')}</div>
       <div class="notes-area"><p class="readonly-notes">${sample.notes ? escapeHtml(sample.notes) : bt('bulletin.noNotes')}</p></div>
 
-      ${sample.bulletinNo && (labBranding?.signatureDataUrl || labBranding?.signatureName || labBranding?.stampDataUrl) ? `
-      <div class="bulletin-signature-block">
-        ${labBranding.signatureDataUrl ? `<img class="bulletin-sig-img" src="${labBranding.signatureDataUrl}" alt="${t('bulletin.signatureAltReal')}">` : ''}
-        ${labBranding.stampDataUrl ? `<img class="bulletin-stamp-img" src="${labBranding.stampDataUrl}" alt="${t('bulletin.stampAltReal')}">` : ''}
-        ${labBranding.signatureName ? `<div class="bulletin-sig-name">${escapeHtml(labBranding.signatureName)}${labBranding.signatureRole ? ` · ${escapeHtml(labBranding.signatureRole)}` : ''}</div>` : ''}
-        <div class="section-hint">${bt('bulletin.simpleSignatureNote')}</div>
-      </div>` : ''}
+      <div id="bulletin-signature-slot">${bulletinSignatureHtml(sample, b)}</div>
       <div class="section-hint bulletin-sampling-disclaimer">${bt('bulletin.samplingDisclaimer')}</div>
 
       <div class="actions-row">
@@ -2016,6 +2077,7 @@ async function renderOperatorApp() {
     { key: 'dashboard', label: t('operator.tabDashboard'), active: operatorView === 'dashboard' },
     { key: 'queue', label: t('operator.tabQueue'), active: operatorView === 'queue' },
     { key: 'archive', label: t('operator.tabArchive'), active: operatorView === 'archive' },
+    { key: 'lab', label: t('lab.tab'), active: operatorView === 'lab' },
   ];
 
   app.innerHTML = `
@@ -2040,6 +2102,8 @@ function renderOperatorViewRoot() {
     renderDashboardView();
   } else if (operatorView === 'archive') {
     renderOperatorArchiveView();
+  } else if (operatorView === 'lab') {
+    renderLabView('operator-view-root');
   } else {
     renderOperatorQueueView();
   }
@@ -2578,36 +2642,50 @@ function readLiveOperatorValues() {
   document.querySelectorAll('.result-input').forEach(i => {
     vals[i.dataset.key] = i.value === '' ? null : Number(i.value);
   });
-  const af = ['afb1','afb2','afg1','afg2'].map(k => vals[k]);
-  const complete = af.every(v => Number.isFinite(v));
+  const limitOf = (id) => { const el = document.getElementById(id); return !el || el.value === '' ? null : Number(el.value); };
   return {
-    afb1: vals.afb1, ota: vals.ota, m1: vals.m1, don: vals.don, zea: vals.zea, fum: vals.fum,
-    sum: complete ? af.reduce((a,b) => a+b, 0) : null,
-    limitAfb1: Number(document.getElementById('f-limitAfb1')?.value),
-    limitSum: Number(document.getElementById('f-limitAflaSum')?.value),
-    limitOta: Number(document.getElementById('f-limitOta')?.value),
-    limitM1: document.getElementById('f-limitM1')?.value === '' ? null : Number(document.getElementById('f-limitM1')?.value),
-    limitDon: document.getElementById('f-limitDon')?.value === '' ? null : Number(document.getElementById('f-limitDon')?.value),
-    limitZea: document.getElementById('f-limitZea')?.value === '' ? null : Number(document.getElementById('f-limitZea')?.value),
-    limitFum: document.getElementById('f-limitFum')?.value === '' ? null : Number(document.getElementById('f-limitFum')?.value)
+    afb1: vals.afb1, afb2: vals.afb2, afg1: vals.afg1, afg2: vals.afg2, ota: vals.ota, m1: vals.m1, don: vals.don, zea: vals.zea, fum: vals.fum,
+    limitAfb1: limitOf('f-limitAfb1'), limitSum: limitOf('f-limitAflaSum'), limitOta: limitOf('f-limitOta'),
+    limitM1: limitOf('f-limitM1'), limitDon: limitOf('f-limitDon'), limitZea: limitOf('f-limitZea'), limitFum: limitOf('f-limitFum')
   };
+}
+
+// Regula și performanța metodei așa cum sunt în formular (nesalvate încă).
+function readLivePerformance() {
+  const ruleEl = document.getElementById('f-decisionRule');
+  const perf = {};
+  document.querySelectorAll('[data-perf-group]').forEach(inp => {
+    const g = inp.dataset.perfGroup, f = inp.dataset.perfField;
+    if (f === 'corrected') { if (inp.checked) (perf[g] = perf[g] || {}).corrected = true; return; }
+    if (inp.value === '') return;
+    (perf[g] = perf[g] || {})[f] = Number(inp.value);
+  });
+  return { rule: ruleEl ? ruleEl.value : 'simple', perf };
+}
+
+function computeLiveVerdicts() {
+  const v = readLiveOperatorValues();
+  const ov = readLivePerformance();
+  const sumInfo = window.DecisionCore.aflatoxinSum(v, ov.perf);
+  const sum = sumInfo ? sumInfo.sum : null;
+  const verdicts = {
+    afb1: sampleVerdict(null, 'afb1', v.afb1, v.limitAfb1, ov),
+    aflaSum: sampleVerdict(null, 'aflaSum', sum, v.limitSum, ov),
+    ota: sampleVerdict(null, 'ota', v.ota, v.limitOta, ov),
+    m1: sampleVerdict(null, 'm1', v.m1, v.limitM1, ov),
+    don: sampleVerdict(null, 'don', v.don, v.limitDon, ov),
+    zea: sampleVerdict(null, 'zea', v.zea, v.limitZea, ov),
+    fum: sampleVerdict(null, 'fum', v.fum, v.limitFum, ov)
+  };
+  const hasAny = [v.afb1, sum, v.ota, v.m1, v.don, v.zea, v.fum].some(x => Number.isFinite(x));
+  const fail = Object.values(verdicts).some(x => x === 'non_conform');
+  return { v, sum, verdicts, hasAny, fail };
 }
 
 function updateLiveAssessment() {
   const box = document.getElementById('live-assessment');
   if (!box) return;
-  const v = readLiveOperatorValues();
-  const checks = [
-    Number.isFinite(v.afb1) && Number.isFinite(v.limitAfb1) && v.afb1 > v.limitAfb1,
-    Number.isFinite(v.sum) && Number.isFinite(v.limitSum) && v.sum > v.limitSum,
-    Number.isFinite(v.ota) && Number.isFinite(v.limitOta) && v.ota > v.limitOta,
-    Number.isFinite(v.m1) && Number.isFinite(v.limitM1) && v.m1 > v.limitM1,
-    Number.isFinite(v.don) && Number.isFinite(v.limitDon) && v.don > v.limitDon,
-    Number.isFinite(v.zea) && Number.isFinite(v.limitZea) && v.zea > v.limitZea,
-    Number.isFinite(v.fum) && Number.isFinite(v.limitFum) && v.fum > v.limitFum
-  ];
-  const hasAny = [v.afb1, v.sum, v.ota, v.m1, v.don, v.zea, v.fum].some(Number.isFinite);
-  const fail = checks.some(Boolean);
+  const { v, sum, verdicts, hasAny, fail } = computeLiveVerdicts();
   box.className = `live-assessment ${fail ? 'fail' : hasAny ? 'review' : 'empty'}`;
   box.innerHTML = fail
     ? `<div><span class="eyebrow">${t('operator.autoCheckEyebrow')}</span><strong>${t('operator.autoCheckFailTitle')}</strong><p>${t('operator.autoCheckFailText')}</p></div><span class="live-assessment-icon">!</span>`
@@ -2615,49 +2693,33 @@ function updateLiveAssessment() {
       ? `<div><span class="eyebrow">${t('operator.autoCheckEyebrow')}</span><strong>${t('operator.autoCheckOkTitle')}</strong><p>${t('operator.autoCheckOkText')}</p></div><span class="live-assessment-icon">✓</span>`
       : `<div><span class="eyebrow">${t('operator.autoCheckEyebrow')}</span><strong>${t('operator.autoCheckEmptyTitle')}</strong><p>${t('operator.autoCheckEmptyText')}</p></div><span class="live-assessment-icon">→</span>`;
 
-  // Actualizeaza si tabelul de contaminanti (suma si verdictele individuale),
-  // care altfel ramanea inghetat la valorile de la incarcarea probei.
+  // Actualizeaza si tabelul de contaminanti (suma si verdictele individuale).
   const sumCell = document.getElementById('live-af-sum');
-  if (sumCell) sumCell.textContent = Number.isFinite(v.sum) ? v.sum.toFixed(2) : '—';
-
+  if (sumCell) sumCell.textContent = Number.isFinite(sum) ? sum.toFixed(2) : '—';
   const sumFlagCell = document.getElementById('live-af-sum-flag');
-  if (sumFlagCell) {
-    if (!Number.isFinite(v.sum)) {
-      sumFlagCell.innerHTML = '<span class="result-flag empty">—</span>';
-    } else if (Number.isFinite(v.limitSum) && v.sum > v.limitSum) {
-      sumFlagCell.innerHTML = `<span class="result-flag fail">${t('operator.flagExceeded')}</span>`;
-    } else {
-      sumFlagCell.innerHTML = `<span class="result-flag ok">${t('operator.flagConform')}</span>`;
-    }
-  }
+  if (sumFlagCell) sumFlagCell.innerHTML = Number.isFinite(sum) ? verdictFlagHtml(verdicts.aflaSum, false) : '<span class="result-flag empty">—</span>';
 
-  const renderRowFlag = (key, value, limit, emptyLimitLabel) => {
+  const renderRowFlag = (key, value, limit, verdict, emptyLimitLabel) => {
     const cell = document.getElementById(`flag-${key}`);
     if (!cell) return;
     const input = document.querySelector(`.result-input[data-key="${key}"]`);
-    const isOver = Number.isFinite(value) && Number.isFinite(limit) && value > limit;
-    if (input) input.classList.toggle('over-limit', isOver);
+    if (input) input.classList.toggle('over-limit', verdict === 'non_conform');
     if (!Number.isFinite(value)) {
       cell.innerHTML = '<span class="result-flag empty">—</span>';
     } else if (!Number.isFinite(limit)) {
       cell.innerHTML = `<span class="result-flag empty">${emptyLimitLabel || t('operator.flagSeeSumTable')}</span>`;
     } else {
-      cell.innerHTML = isOver ? `<span class="result-flag fail">${t('operator.flagExceeded')}</span>` : `<span class="result-flag ok">${t('operator.flagConform')}</span>`;
+      cell.innerHTML = verdictFlagHtml(verdict, false);
     }
   };
-  renderRowFlag('afb1', v.afb1, v.limitAfb1);
-  renderRowFlag('ota', v.ota, v.limitOta);
-  renderRowFlag('m1', v.m1, v.limitM1, t('operator.noLimitFlag'));
-  renderRowFlag('don', v.don, v.limitDon, t('operator.noLimitFlag'));
-  renderRowFlag('zea', v.zea, v.limitZea, t('operator.noLimitFlag'));
-  renderRowFlag('fum', v.fum, v.limitFum, t('operator.noLimitFlag'));
-  // AFB2/AFG1/AFG2 nu au limita individuala (doar suma conteaza), dar tot
-  // trebuie sa arate "v. sumă" cand au o valoare introdusa.
-  ['afb2', 'afg1', 'afg2'].forEach(key => {
-    const el = document.querySelector(`.result-input[data-key="${key}"]`);
-    const val = el && el.value !== '' ? Number(el.value) : null;
-    renderRowFlag(key, val, null);
-  });
+  renderRowFlag('afb1', v.afb1, v.limitAfb1, verdicts.afb1);
+  renderRowFlag('ota', v.ota, v.limitOta, verdicts.ota);
+  renderRowFlag('m1', v.m1, v.limitM1, verdicts.m1, t('operator.noLimitFlag'));
+  renderRowFlag('don', v.don, v.limitDon, verdicts.don, t('operator.noLimitFlag'));
+  renderRowFlag('zea', v.zea, v.limitZea, verdicts.zea, t('operator.noLimitFlag'));
+  renderRowFlag('fum', v.fum, v.limitFum, verdicts.fum, t('operator.noLimitFlag'));
+  // AFB2/AFG1/AFG2 nu au limita individuala (doar suma conteaza).
+  ['afb2', 'afg1', 'afg2'].forEach(key => renderRowFlag(key, v[key], null, null));
 }
 
 async function renderNonconformingPanel(sampleId) {
@@ -2732,6 +2794,7 @@ async function renderOperatorDetail() {
   updateStaffGuideProgress(sample, currentUser.role);
 
   await ensureRuleProfilesCache();
+  await ensureLabRegistry();
 
   // Selectia de profil e legata de proba curenta - daca s-a schimbat proba
   // fata de ultima selectie, resetam (fiecare proba isi porneste propria
@@ -2790,7 +2853,8 @@ async function renderOperatorDetail() {
         showToast(t('owner.retestError') + ' ' + err.message);
       }
     });
-    if (sample.bulletinNo) loadBulletinQr(sample.id);
+    if (sample.bulletinNo) { loadBulletinQr(sample.id); loadIssuedBranding(sample); }
+  loadBulletinLab(sample);
     return;
   }
 
@@ -2821,6 +2885,7 @@ async function renderOperatorDetail() {
         <div class="intake-gate-eyebrow">${t('operator.intakeGateEyebrow')}</div>
         <h3>${t('operator.intakeGateTitle')}</h3>
         <p>${t('operator.intakeGateBody')}</p>
+        ${intakeGateFieldsHtml()}
         <div class="intake-gate-actions">
           <button class="btn" id="intake-gate-yes">${t('operator.intakeGateYes')}</button>
           <button class="btn secondary" id="intake-gate-no">${t('operator.intakeGateNo')}</button>
@@ -2837,7 +2902,7 @@ async function renderOperatorDetail() {
     document.getElementById('btn-print-label').addEventListener('click', () => printSampleLabel(sample.id));
     document.getElementById('intake-gate-yes').addEventListener('click', async () => {
       try {
-        await api(`/results/${sample.id}`, { method: 'PUT', body: JSON.stringify({ intakeConfirmed: true }) });
+        await api(`/results/${sample.id}`, { method: 'PUT', body: JSON.stringify({ intakeConfirmed: true, intakeCondition: collectIntakeCondition() }) });
         await loadOperatorQueue();
         renderOperatorDetail();
       } catch (err) { showToast(t('operator.saveError') + ' ' + err.message); }
@@ -2877,9 +2942,7 @@ async function renderOperatorDetail() {
     return;
   }
 
-  const afVals = ['afb1', 'afb2', 'afg1', 'afg2'].map(k => sample[k]);
-  const afAllEntered = afVals.every(v => v !== null && v !== undefined);
-  const afSum = afAllEntered ? afVals.reduce((a, b) => a + b, 0) : null;
+  const afSum = sampleAflaSum(sample);
 
   panel.innerHTML = `
     ${renderWorkflowRail(sample, 'operator')}
@@ -2958,6 +3021,7 @@ async function renderOperatorDetail() {
           <input type="number" step="0.1" id="f-limitOta" value="${sample.limitOta ?? ''}">
         </div>
         ${performanceFormHtml(sample)}
+        ${labExtrasFormHtml(sample)}
       </div>
 
       <div class="section-label"><span>${t('operator.contaminantResultsTitle')} <span class="unit">(µg/kg)</span></span><span class="section-hint">${t('operator.contaminantResultsHint')}</span></div>
@@ -2981,11 +3045,12 @@ async function renderOperatorDetail() {
                 const val = sample[row.key];
                 const limitKey = row.key === 'afb1' ? 'limitAfb1' : null;
                 const limit = limitKey ? sample[limitKey] : null;
-                const isOver = limit !== null && val !== null && val !== undefined && val > limit;
+                const verdict = sampleVerdict(sample, row.key, val, limit);
+                const isOver = verdict === 'non_conform';
                 let flag = '<span class="result-flag empty">—</span>';
                 if (val !== null && val !== undefined) {
                   if (limit === null) flag = `<span class="result-flag empty">${t('operator.flagSeeSumTable')}</span>`;
-                  else flag = isOver ? `<span class="result-flag fail">${t('operator.flagExceeded')}</span>` : `<span class="result-flag ok">${t('operator.flagConform')}</span>`;
+                  else flag = verdictFlagHtml(verdict, false);
                 }
                 return `
                   <tr>
@@ -3001,7 +3066,7 @@ async function renderOperatorDetail() {
                   <td class="name-cell">${t('operator.aflatoxinSumRowLabel')}</td>
                   <td class="mono" id="live-af-sum">${afSum !== null ? afSum.toFixed(2) : '—'}</td>
                   <td class="limit-cell mono">${sample.limitAflaSum ?? '—'}</td>
-                  <td id="live-af-sum-flag">${afSum !== null && sample.limitAflaSum !== null && afSum > sample.limitAflaSum ? `<span class="result-flag fail">${t('operator.flagExceeded')}</span>` : afSum !== null ? `<span class="result-flag ok">${t('operator.flagConform')}</span>` : '<span class="result-flag empty">—</span>'}</td>
+                  <td id="live-af-sum-flag">${afSum !== null ? verdictFlagHtml(sampleVerdict(sample, 'aflaSum', afSum, sample.limitAflaSum), false) : '<span class="result-flag empty">—</span>'}</td>
                 </tr>
               `;
             }
@@ -3009,10 +3074,11 @@ async function renderOperatorDetail() {
             if (hasTest('ota')) {
               const val = sample.ota;
               const limit = sample.limitOta;
-              const isOver = limit !== null && val !== null && val !== undefined && val > limit;
+              const verdict = sampleVerdict(sample, 'ota', val, limit);
+              const isOver = verdict === 'non_conform';
               let flag = '<span class="result-flag empty">—</span>';
               if (val !== null && val !== undefined) {
-                flag = isOver ? `<span class="result-flag fail">${t('operator.flagExceeded')}</span>` : `<span class="result-flag ok">${t('operator.flagConform')}</span>`;
+                flag = verdictFlagHtml(verdict, false);
               }
               rows += `
                 <tr class="ota-row">
@@ -3028,12 +3094,12 @@ async function renderOperatorDetail() {
               rows += `
                 <tr class="m1-row">
                   <td class="name-cell" style="padding-left:28px;">${bt('bulletin.aflatoxinM1Name')} <span class="section-hint">${bt('bulletin.milkOnly')}</span></td>
-                  <td><input type="number" step="0.001" min="0" class="mono result-input ${(sample.limitM1 !== null && sample.limitM1 !== undefined && sample.m1 !== null && sample.m1 !== undefined && sample.m1 > sample.limitM1) ? 'over-limit' : ''}" data-key="m1" value="${sample.m1 !== null && sample.m1 !== undefined ? sample.m1 : ''}" placeholder="0.000"></td>
+                  <td><input type="number" step="0.001" min="0" class="mono result-input ${sampleVerdict(sample, 'm1', sample.m1, sample.limitM1) === 'non_conform' ? 'over-limit' : ''}" data-key="m1" value="${sample.m1 !== null && sample.m1 !== undefined ? sample.m1 : ''}" placeholder="0.000"></td>
                   <td class="limit-cell mono"><input type="number" step="0.001" min="0" id="f-limitM1" class="mono" value="${sample.limitM1 ?? ''}" placeholder="${t('operator.m1LimitPlaceholder')}" style="width:90px;"></td>
                   <td id="flag-m1">${(() => {
                     if (sample.m1 === null || sample.m1 === undefined) return '<span class="result-flag empty">—</span>';
                     if (sample.limitM1 === null || sample.limitM1 === undefined) return `<span class="result-flag empty">${t('operator.noLimitFlag')}</span>`;
-                    return sample.m1 > sample.limitM1 ? `<span class="result-flag fail">${t('operator.flagExceeded')}</span>` : `<span class="result-flag ok">${t('operator.flagConform')}</span>`;
+                    return verdictFlagHtml(sampleVerdict(sample, 'm1', sample.m1, sample.limitM1), false);
                   })()}</td>
                 </tr>
               `;
@@ -3307,6 +3373,7 @@ async function renderOperatorDetail() {
       limitFum: document.getElementById('f-limitFum')?.value ?? '',
       limitChangeReason: document.getElementById('f-limitReason')?.value.trim() || '',
       ...collectPerformancePayload(),
+      ...collectLabExtras(),
     };
     document.querySelectorAll('.result-input').forEach(input => {
       payload[input.dataset.key] = input.value;
@@ -3353,6 +3420,7 @@ async function renderOperatorDetail() {
       limitFum: document.getElementById('f-limitFum')?.value ?? '',
       limitChangeReason: document.getElementById('f-limitReason')?.value.trim() || '',
       ...collectPerformancePayload(),
+      ...collectLabExtras(),
     };
     document.querySelectorAll('.result-input').forEach(input => {
       payload[input.dataset.key] = input.value;
@@ -3388,12 +3456,7 @@ async function renderOperatorDetail() {
       if (targetId) focusAndExplain(targetId, message);
       return;
     }
-    const live = readLiveOperatorValues();
-    const hasFailure = [
-      Number.isFinite(live.afb1) && Number.isFinite(live.limitAfb1) && live.afb1 > live.limitAfb1,
-      Number.isFinite(live.sum) && Number.isFinite(live.limitSum) && live.sum > live.limitSum,
-      Number.isFinite(live.ota) && Number.isFinite(live.limitOta) && live.ota > live.limitOta
-    ].some(Boolean);
+    const hasFailure = computeLiveVerdicts().fail;
     const confirmation = hasFailure
       ? t('operator.confirmValidateNonconform')
       : t('operator.confirmValidateBulletin');
@@ -3749,7 +3812,7 @@ function renderQualityView() {
     [t('admin.qItem2Name'), 'partial', t('admin.qItem2Desc')],
     [t('admin.qItem3Name'), 'outside', t('admin.qItem3Desc')],
     [t('admin.qItem4Name'), 'outside', t('admin.qItem4Desc')],
-    [t('admin.qItem5Name'), 'outside', t('admin.qItem5Desc')],
+    [t('admin.qItem5Name'), 'partial', t('admin.qItem5Desc')],
     [t('admin.qItem6Name'), 'partial', t('admin.qItem6Desc')],
     [t('admin.qItem7Name'), 'covered', t('admin.qItem7Desc')],
     [t('admin.qItem8Name'), 'partial', t('admin.qItem8Desc')],
@@ -3984,6 +4047,7 @@ async function renderAdminApp() {
     { key: 'dashboard', label: t('operator.tabDashboard'), active: adminView === 'dashboard' },
     { key: 'operators', label: t('admin.tabOperators'), active: adminView === 'operators' },
     { key: 'quality', label: t('admin.tabQuality'), active: adminView === 'quality' },
+    { key: 'lab', label: t('lab.tab'), active: adminView === 'lab' },
     { key: 'branding', label: t('admin.tabBranding'), active: adminView === 'branding' }
   ];
   app.innerHTML = `
@@ -4008,8 +4072,13 @@ async function renderAdminViewRoot() {
   }
   if (adminView === 'quality') {
     renderQualityView();
+    await renderPolicyCard();
     await renderValidationPanel();
     await renderIncidentPanel();
+    return;
+  }
+  if (adminView === 'lab') {
+    await renderLabView('admin-view-root');
     return;
   }
   if (adminView === 'branding') {

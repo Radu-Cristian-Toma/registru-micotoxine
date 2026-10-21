@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db/database');
+const { logEvent } = require('../db/audit');
 const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -27,6 +28,7 @@ router.post('/operators', requireRole('admin'), (req, res) => {
     VALUES (?, ?, ?, 'operator')
   `).run(email.toLowerCase().trim(), hash, fullName.trim());
 
+  logEvent(req.session.user.id, 'account_created', { newUserId: info.lastInsertRowid, email: email.toLowerCase().trim(), role: 'operator' });
   res.json({ id: info.lastInsertRowid, email: email.toLowerCase().trim(), fullName: fullName.trim(), role: 'operator' });
 });
 
@@ -64,6 +66,7 @@ router.post('/validators', requireRole('admin'), (req, res) => {
     VALUES (?, ?, ?, 'validator')
   `).run(email.toLowerCase().trim(), hash, fullName.trim());
 
+  logEvent(req.session.user.id, 'account_created', { newUserId: info.lastInsertRowid, email: email.toLowerCase().trim(), role: 'validator' });
   res.json({ id: info.lastInsertRowid, email: email.toLowerCase().trim(), fullName: fullName.trim(), role: 'validator' });
 });
 
@@ -129,6 +132,16 @@ router.put('/lab-settings', requireRole('admin'), (req, res) => {
     return res.status(400).json({ error: 'Adresa de email nu este validă.' });
   }
 
+  // Jurnalizam CE s-a schimbat (nume de campuri; imaginile doar ca „modificat"),
+  // nu si continutul imaginilor.
+  const prevSettings = db.prepare('SELECT * FROM lab_settings WHERE id = 1').get() || {};
+  const nv = (v) => ((v || '').trim() || null);
+  const changedFields = [];
+  [['institution_name', nv(institutionName)], ['institution_address', nv(institutionAddress)], ['institution_email', trimmedEmail || null],
+   ['institution_phone', nv(institutionPhone)], ['logo_data_url', logoDataUrl || null], ['signature_data_url', signatureDataUrl || null],
+   ['signature_name', nv(signatureName)], ['signature_role', nv(signatureRole)], ['stamp_data_url', stampDataUrl || null]]
+    .forEach(([col, val]) => { if ((prevSettings[col] ?? null) !== val) changedFields.push(col); });
+
   db.prepare(`
     UPDATE lab_settings SET
       institution_name = ?, institution_address = ?, institution_email = ?, institution_phone = ?, logo_data_url = ?,
@@ -147,6 +160,7 @@ router.put('/lab-settings', requireRole('admin'), (req, res) => {
     stampDataUrl || null,
     req.session.user.id
   );
+  logEvent(req.session.user.id, 'lab_settings_updated', { changedFields });
 
   res.json({ ok: true });
 });

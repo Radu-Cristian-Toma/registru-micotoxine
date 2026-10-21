@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db/database');
+const { logEvent } = require('../db/audit');
 const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -30,6 +31,7 @@ router.post('/:id', requireRole('admin'), (req, res) => {
   db.prepare(`UPDATE system_validation_tests
     SET result = ?, note = ?, executed_by = ?, executed_at = datetime('now', 'localtime')
     WHERE id = ?`).run(result, note, req.session.user.id, req.params.id);
+  logEvent(req.session.user.id, 'validation_test_recorded', { code: test.code, result, note });
   res.json({ ok: true });
 });
 

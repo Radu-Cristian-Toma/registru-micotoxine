@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db/database');
+const { logEvent } = require('../db/audit');
 const { requireRole } = require('../middleware/auth');
 const { DEFAULT_LIMITS, LIMIT_REGULATION_REF, evaluateResult, evaluateArchiveRow, getRuleProfile, availableGroupsForProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
 const { detectIncreasingTrend } = require('../db/trend-analysis');
@@ -185,6 +186,7 @@ router.post('/control', requireRole('operator', 'admin'), (req, res) => {
     INSERT INTO results (sample_id, limit_afb1, limit_afla_sum, limit_ota, limit_m1, limit_don, limit_zea, limit_fum)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(info.lastInsertRowid, limitAfb1, limitAflaSum, limitOta, limitM1, limitDon, limitZea, limitFum);
+  logEvent(req.session.user.id, 'control_sample_created', { code, productName: productName.trim(), category: category || null }, info.lastInsertRowid);
 
   res.json({ id: info.lastInsertRowid, code });
 });
@@ -486,7 +488,9 @@ router.put('/:id/due-date', requireRole('operator', 'admin'), (req, res) => {
     }
   }
 
+  const previousDue = db.prepare('SELECT due_date FROM samples WHERE id = ?').get(req.params.id)?.due_date ?? null;
   db.prepare('UPDATE samples SET due_date = ? WHERE id = ?').run(dueDate || null, req.params.id);
+  logEvent(req.session.user.id, 'due_date_changed', { from: previousDue, to: dueDate || null }, req.params.id);
   res.json({ ok: true, dueDate: dueDate || null });
 });
 

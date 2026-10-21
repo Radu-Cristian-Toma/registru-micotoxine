@@ -1617,3 +1617,10 @@ table.contaminants th .bulletin-en {
 .table-scroll { overflow-x: auto; }
 @media (max-width: 720px) { .lab-pick { grid-template-columns: 1fr; } }
 @media print { .no-print, .bulletin-lab-actions { display: none !important; } .lifecycle-banner { border-width: 3px; } }
+.lab-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 10px 0 14px; }
+.lab-grid .field { margin-bottom: 0; }
+@media (max-width: 720px) { .lab-grid { grid-template-columns: 1fr; } }
+.lab-card { max-width: 1080px; margin: 0 auto 28px; }
+.lab-pick .field label.checkbox-row, .lab-card .field label.checkbox-row, .intake-condition .field label.checkbox-row { font-size: 14px; text-transform: none; letter-spacing: 0; color: inherit; font-weight: 400; }
+.lab-line { margin: 5px 0; }
+.lab-line > div { margin-top: 1px; }

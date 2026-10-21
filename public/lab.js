@@ -99,7 +99,7 @@
     return `
       <div class="lab-extras" id="lab-extras">
         <div class="section-label"><span>${L('extrasTitle')}</span></div>
-        <div class="form-grid">
+        <div class="lab-grid">
           <div class="field"><label for="f-basis">${L('basis')}</label>
             <select id="f-basis"><option value="as_is" ${basis === 'as_is' ? 'selected' : ''}>${L('basisAsIs')}</option><option value="dry_matter" ${basis === 'dry_matter' ? 'selected' : ''}>${L('basisDry')}</option></select>
             <div class="section-hint">${L('basisHint')}</div></div>
@@ -116,7 +116,7 @@
         </div>
         ${valueKeys.length ? `<details class="lab-clear"><summary>${L('clearTitle')}</summary>
           <div class="section-hint">${L('clearHint')}</div>
-          <div class="form-grid"><div class="field"><label for="f-clear-field">${L('clearField')}</label>
+          <div class="lab-grid"><div class="field"><label for="f-clear-field">${L('clearField')}</label>
             <select id="f-clear-field"><option value="">${L('clearNone')}</option>${valueKeys.map(k => `<option value="${k}">${k.toUpperCase()} = ${esc(sample[k])}</option>`).join('')}</select></div>
             <div class="field"><label for="f-clear-reason">${L('clearReason')}</label><input type="text" id="f-clear-reason" maxlength="300"></div></div></details>` : ''}
       </div>`;
@@ -141,7 +141,7 @@
   window.intakeGateFieldsHtml = function () {
     return `<div class="intake-condition">
       <h4>${L('intakeTitle')}</h4>
-      <div class="form-grid">
+      <div class="lab-grid">
         <div class="field"><label for="ic-packaging">${L('packaging')}</label>
           <select id="ic-packaging"><option value="intact">${L('pkgIntact')}</option><option value="damaged">${L('pkgDamaged')}</option><option value="opened">${L('pkgOpened')}</option></select></div>
         <div class="field"><label for="ic-temp">${L('tempC')}</label><input type="number" step="0.1" id="ic-temp"></div>
@@ -201,11 +201,11 @@
         const smp = s.samplingDeclared || {};
         const ls = s.labSample || {};
         html += `<div class="bulletin-lab section-hint" style="margin:8px 0;">
-          <div><strong>${bt('lab.bulSampleCond')}</strong>: ${intakeText(s.intake)}</div>
-          <div><strong>${bt('lab.bulBasis')}</strong>: ${s.reportingBasis === 'dry_matter' ? L('basisDry') + (s.dryMatterPct != null ? ` (${esc(s.dryMatterPct)} %)` : '') : L('basisAsIs')}</div>
-          ${(ls.massG != null || ls.homogenization || ls.replicates != null) ? `<div><strong>${bt('lab.bulLabSample')}</strong>: ${[ls.massG != null ? `${L('bulMass')} ${esc(ls.massG)} g` : null, ls.homogenization ? esc(ls.homogenization) : null, ls.replicates != null ? `${esc(ls.replicates)} ${L('bulRepl')}` : null].filter(Boolean).join(' · ')}</div>` : ''}
-          ${(smp.lotSizeKg != null || smp.incrementsCount != null || smp.samplingMethod) ? `<div><strong>${bt('lab.bulSampling')}</strong>: ${[smp.lotSizeKg != null ? `${L('bulLot')} ${esc(smp.lotSizeKg)} kg` : null, smp.incrementsCount != null ? `${L('bulIncr')} ${esc(smp.incrementsCount)}` : null, smp.samplingMethod ? esc(smp.samplingMethod) : null].filter(Boolean).join(' · ')} — <em>${L('samplingDisclaimer')}</em></div>` : ''}
-          ${(tr.equipment.length || tr.lots.length) ? `<div><strong>${bt('lab.bulTrace')}</strong>: ${[...tr.equipment.map(e => `${esc(e.code)} ${esc(e.name)}${e.calibrationDue ? ` (${L('bulCalDue')} ${esc(e.calibrationDue)})` : ''}`), ...tr.lots.map(l => `${esc(l.code)} ${esc(l.name)} ${esc(l.lotNo)}${l.expiryDate ? ` (${L('bulExpires')} ${esc(l.expiryDate)})` : ''}`)].join('; ')}</div>` : ''}
+          <div class=\"lab-line\"><strong>${bt('lab.bulSampleCond')}</strong><div>${intakeText(s.intake)}</div>
+          <div class=\"lab-line\"><strong>${bt('lab.bulBasis')}</strong><div>${s.reportingBasis === 'dry_matter' ? L('basisDry') + (s.dryMatterPct != null ? ` (${esc(s.dryMatterPct)} %)` : '') : L('basisAsIs')}</div>
+          ${(ls.massG != null || ls.homogenization || ls.replicates != null) ? `<div class=\"lab-line\"><strong>${bt('lab.bulLabSample')}</strong><div>${[ls.massG != null ? `${L('bulMass')} ${esc(ls.massG)} g` : null, ls.homogenization ? esc(ls.homogenization) : null, ls.replicates != null ? `${esc(ls.replicates)} ${L('bulRepl')}` : null].filter(Boolean).join(' · ')}</div>` : ''}
+          ${(smp.lotSizeKg != null || smp.incrementsCount != null || smp.samplingMethod) ? `<div class=\"lab-line\"><strong>${bt('lab.bulSampling')}</strong><div>${[smp.lotSizeKg != null ? `${L('bulLot')} ${esc(smp.lotSizeKg)} kg` : null, smp.incrementsCount != null ? `${L('bulIncr')} ${esc(smp.incrementsCount)}` : null, smp.samplingMethod ? esc(smp.samplingMethod) : null].filter(Boolean).join(' · ')} — <em>${L('samplingDisclaimer')}</em></div>` : ''}
+          ${(tr.equipment.length || tr.lots.length) ? `<div class=\"lab-line\"><strong>${bt('lab.bulTrace')}</strong><div>${[...tr.equipment.map(e => `${esc(e.code)} ${esc(e.name)}${e.calibrationDue ? ` (${L('bulCalDue')} ${esc(e.calibrationDue)})` : ''}`), ...tr.lots.map(l => `${esc(l.code)} ${esc(l.name)} ${esc(l.lotNo)}${l.expiryDate ? ` (${L('bulExpires')} ${esc(l.expiryDate)})` : ''}`)].join('; ')}</div>` : ''}
         </div>`;
       } catch (_) { /* instantaneul poate lipsi la buletine mai vechi */ }
     }
@@ -281,7 +281,7 @@
         <div class="lab-status-grid">${st.groups.map(g => `<div class="lab-status-card">${chip(g.state, stateLabel(g.state))}<strong>${esc(GROUP_LABEL[g.analyteGroup])}</strong>${g.last ? `<span class="section-hint">${esc(g.last.createdAt)} · ${L('recovery')} ${Math.round(g.last.recoveryPct * 10) / 10} %</span>` : ''}</div>`).join('')}</div>
         <p class="section-hint">${L('maxAge')}: ${esc(st.maxAgeDays)} ${L('days')}.</p></section>
       ${edit ? `<section class="lab-section"><h3>${L('qc')}</h3><p class="section-hint">${L('qcRangeHint')}</p>
-        <div class="form-grid">
+        <div class="lab-grid">
           <div class="field"><label for="qc-group">${L('group')}</label><select id="qc-group">${Object.keys(GROUP_LABEL).map(k => `<option value="${k}">${esc(GROUP_LABEL[k])}</option>`).join('')}</select></div>
           <div class="field"><label for="qc-lot">${L('refLot')}</label><select id="qc-lot"><option value="">—</option>${lots.filter(l => l.status === 'active').map(l => `<option value="${l.id}">${esc(l.code)} · ${esc(l.name)}</option>`).join('')}</select></div>
           ${fld('qc-measured', L('measured'), 'number', 'step="any" min="0"')}${fld('qc-expected', L('expected'), 'number', 'step="any" min="0"')}
@@ -293,11 +293,11 @@
       <section class="lab-section"><h3>${L('equipment')}</h3>
         ${eq.length ? `<div class="table-scroll"><table class="contaminants"><thead><tr><th>${L('code')}</th><th>${L('name')}</th><th>${L('calDue')}</th><th>${L('calRef')}</th><th>${L('status')}</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
         ${eq.map(e => `<tr><td class="mono">${esc(e.code)}</td><td>${esc(e.name)}<div class="section-hint">${esc(e.type || '')} ${esc(e.serialNo || '')} ${esc(e.location || '')}</div></td><td>${chip(e.calibrationState, calLabel(e.calibrationState))}<div class="mono">${esc(e.calibrationDue || '')}</div></td><td>${esc(e.calibrationRef || '')}</td><td>${e.status === 'active' ? L('active') : L('retired')}</td>${edit ? `<td><button class="btn secondary small-btn btn-eq-edit" data-id="${e.id}">${L('edit')}</button> <button class="btn secondary small-btn btn-eq-status" data-id="${e.id}" data-status="${e.status === 'active' ? 'retired' : 'active'}">${e.status === 'active' ? L('retire') : L('reactivate')}</button></td>` : ''}</tr>`).join('')}</tbody></table></div>` : `<p class="section-hint">${L('none')}</p>`}
-        ${edit ? `<div class="form-grid" id="eq-form"><input type="hidden" id="eq-id">${fld('eq-code', L('code'), 'text', 'maxlength="40"')}${fld('eq-name', L('name'), 'text', 'maxlength="200"')}${fld('eq-type', L('type'), 'text', 'maxlength="100"')}${fld('eq-serial', L('serial'), 'text', 'maxlength="100"')}${fld('eq-location', L('location'), 'text', 'maxlength="100"')}${fld('eq-caldate', L('calDate'), 'date')}${fld('eq-caldue', L('calDue'), 'date')}${fld('eq-calref', L('calRef'), 'text', 'maxlength="200"')}</div><button class="btn" id="btn-eq-save">${L('save')}</button>` : ''}</section>
+        ${edit ? `<div class="lab-grid" id="eq-form"><input type="hidden" id="eq-id">${fld('eq-code', L('code'), 'text', 'maxlength="40"')}${fld('eq-name', L('name'), 'text', 'maxlength="200"')}${fld('eq-type', L('type'), 'text', 'maxlength="100"')}${fld('eq-serial', L('serial'), 'text', 'maxlength="100"')}${fld('eq-location', L('location'), 'text', 'maxlength="100"')}${fld('eq-caldate', L('calDate'), 'date')}${fld('eq-caldue', L('calDue'), 'date')}${fld('eq-calref', L('calRef'), 'text', 'maxlength="200"')}</div><button class="btn" id="btn-eq-save">${L('save')}</button>` : ''}</section>
       <section class="lab-section"><h3>${L('lots')}</h3>
         ${lots.length ? `<div class="table-scroll"><table class="contaminants"><thead><tr><th>${L('code')}</th><th>${L('name')}</th><th>${L('lotKind')}</th><th>${L('expiry')}</th><th>${L('certValue')}</th><th>${L('status')}</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
         ${lots.map(l => `<tr><td class="mono">${esc(l.code)}</td><td>${esc(l.name)}<div class="section-hint">${esc(l.lotNo)} ${esc(l.supplier || '')}</div></td><td>${esc(KIND()[l.kind])}${l.analyteGroup ? ` · ${esc(GROUP_LABEL[l.analyteGroup] || l.analyteGroup)}` : ''}</td><td>${chip(l.expiryState, expLabel(l.expiryState))}<div class="mono">${esc(l.expiryDate || '')}</div></td><td class="mono">${l.certifiedValue != null ? `${esc(l.certifiedValue)}${l.certifiedU != null ? ' ± ' + esc(l.certifiedU) : ''} ${esc(l.unit || '')}` : '—'}</td><td>${l.status === 'active' ? L('active') : L('retired')}</td>${edit ? `<td><button class="btn secondary small-btn btn-lot-status" data-id="${l.id}" data-status="${l.status === 'active' ? 'retired' : 'active'}">${l.status === 'active' ? L('retire') : L('reactivate')}</button></td>` : ''}</tr>`).join('')}</tbody></table></div>` : `<p class="section-hint">${L('none')}</p>`}
-        ${edit ? `<div class="form-grid" id="lot-form">${fld('lot-code', L('code'), 'text', 'maxlength="40"')}${fld('lot-name', L('name'), 'text', 'maxlength="200"')}
+        ${edit ? `<div class="lab-grid" id="lot-form">${fld('lot-code', L('code'), 'text', 'maxlength="40"')}${fld('lot-name', L('name'), 'text', 'maxlength="200"')}
           <div class="field"><label for="lot-kind">${L('lotKind')}</label><select id="lot-kind">${Object.entries(KIND()).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
           ${fld('lot-no', L('lotNo'), 'text', 'maxlength="100"')}${fld('lot-supplier', L('supplier'), 'text', 'maxlength="200"')}${fld('lot-expiry', L('expiry'), 'date')}
           <div class="field"><label for="lot-group">${L('group')}</label><select id="lot-group"><option value="">—</option>${Object.keys(GROUP_LABEL).map(k => `<option value="${k}">${esc(GROUP_LABEL[k])}</option>`).join('')}</select></div>
@@ -345,9 +345,9 @@
     let p;
     try { p = (await api('/admin/policy')).policy; } catch (_) { return; }
     const card = document.createElement('div');
-    card.className = 'admin-panel view-transition';
+    card.className = 'admin-panel view-transition lab-card';
     card.innerHTML = `<div class="admin-section-head"><div><h2>${L('policyTitle')}</h2></div></div>
-      <div class="form-grid">
+      <div class="lab-grid">
         <div class="field"><label class="checkbox-row"><input type="checkbox" id="pol-strict" ${p.strictRoles ? 'checked' : ''}> ${L('strictRoles')}</label><div class="section-hint">${L('strictHint')}</div></div>
         <div class="field"><label for="pol-reason">${L('relaxReason')}</label><input type="text" id="pol-reason" maxlength="300"></div>
         <div class="field"><label for="pol-retention">${L('retention')}</label><input type="number" min="1" max="100" step="1" id="pol-retention" value="${esc(p.retentionYears ?? '')}"><div class="section-hint">${L('retentionHint')}</div></div>

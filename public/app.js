@@ -3812,7 +3812,7 @@ function renderQualityView() {
     [t('admin.qItem2Name'), 'partial', t('admin.qItem2Desc')],
     [t('admin.qItem3Name'), 'outside', t('admin.qItem3Desc')],
     [t('admin.qItem4Name'), 'outside', t('admin.qItem4Desc')],
-    [t('admin.qItem5Name'), 'outside', t('admin.qItem5Desc')],
+    [t('admin.qItem5Name'), 'partial', t('admin.qItem5Desc')],
     [t('admin.qItem6Name'), 'partial', t('admin.qItem6Desc')],
     [t('admin.qItem7Name'), 'covered', t('admin.qItem7Desc')],
     [t('admin.qItem8Name'), 'partial', t('admin.qItem8Desc')],

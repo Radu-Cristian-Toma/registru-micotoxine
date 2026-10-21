@@ -1000,7 +1000,7 @@ const TRANSLATIONS = {
     incidentRegisteredToast: { ro: 'Incidentul a fost înregistrat.', en: 'The incident has been registered.' },
     // renderQualityView
     qItem1Name: { ro: 'Impartialitate și independență', en: 'Impartiality and independence' },
-    qItem1Desc: { ro: 'Aplicația separă rolurile și drepturile de acces. Conflictul de interese nu este încă gestionat procedural.', en: "The application separates roles and access rights. Conflict of interest is not yet handled procedurally." },
+    qItem1Desc: { ro: 'Aplicația separă rolurile; implicit, administratorul nu introduce, nu aprobă și nu validează, iar cine a aprobat o probă nu o validează (relaxabil numai cu motiv scris, jurnalizat). Declararea și gestionarea conflictului de interese rămân procedurale [de completat de laborator].', en: "The application separates roles; by default the administrator cannot enter, review or validate, and whoever approved a sample cannot validate it (relaxable only with a written, logged reason). Declaring and managing conflicts of interest remain procedural [to be completed by the laboratory]." },
     qItem2Name: { ro: 'Confidențialitate și acces la informații', en: 'Confidentiality and access to information' },
     qItem2Desc: { ro: 'Autentificarea și controlul pe roluri există. Politicile de retenție și confidențialitate trebuie definite la implementarea reală.', en: "Authentication and role-based control exist. Retention and confidentiality policies must be defined during real implementation." },
     qItem3Name: { ro: 'Competența personalului', en: 'Staff competence' },
@@ -1008,7 +1008,7 @@ const TRANSLATIONS = {
     qItem4Name: { ro: 'Metode de încercare', en: 'Test methods' },
     qItem4Desc: { ro: 'Aplicația înregistrează metoda utilizată, dar nu implementează validarea/verificarea metodei.', en: "The application records the method used but does not implement method validation/verification." },
     qItem5Name: { ro: 'Trasabilitatea măsurărilor', en: 'Traceability of measurements' },
-    qItem5Desc: { ro: 'Nu presupunem echipamente. Trasabilitatea metrologică se va lega ulterior de echipamente și etaloane.', en: "We do not assume equipment. Metrological traceability will later be linked to equipment and standards." },
+    qItem5Desc: { ro: 'Registru simplu de echipamente (calibrare, scadență) și de loturi de reactivi/materiale de referință (expirare, valoare certificată), legate de rezultat; trimiterea este refuzată cu calibrare sau lot expirat. Certificatele de calibrare și lanțul metrologic rămân ale laboratorului [de completat].', en: "A simple register of equipment (calibration, due date) and of reagent / reference-material lots (expiry, certified value), linked to the result; submission is refused with an expired calibration or lot. Calibration certificates and the metrological chain remain the laboratory's responsibility [to be completed]." },
     qItem6Name: { ro: 'Eșantionare și identificarea obiectului de încercare', en: 'Sampling and identification of the test item' },
     qItem6Desc: { ro: 'Codul probei, proprietarul, produsul, data și persoana de prelevare sunt înregistrate. Procedura formală de eșantionare rămâne în afara aplicației.', en: "The sample code, owner, product, date, and sampler are recorded. The formal sampling procedure remains outside the application." },
     qItem7Name: { ro: 'Înregistrări tehnice și trasabilitate', en: 'Technical records and traceability' },

@@ -51,8 +51,11 @@ test('limitele tuturor profilurilor existente sunt neschimbate', () => {
   }
 });
 
+// Profiluri adăugate în Etapa B (L23/L24); testate în limits-profiles.test.js
+const ETAPA_B_PROFILES = ['cereal-milling-products', 'dried-vine-fruit-final', 'dried-vine-fruit-sorting', 'durum-wheat-unprocessed', 'oats-unprocessed', 'oilseeds-ota-final', 'pistachios-sorting', 'pistachios-final', 'instant-coffee'];
+
 test('lista de profiluri conține exact profilurile de referință plus Capsicum', () => {
-  assert.deepEqual(RULE_PROFILES.map(r => r.id).sort(), [...Object.keys(BASELINE), 'capsicum-dried'].sort());
+  assert.deepEqual(RULE_PROFILES.map(r => r.id).sort(), [...Object.keys(BASELINE), 'capsicum-dried', ...ETAPA_B_PROFILES].sort());
 });
 
 test('profilul Capsicum: OTA 20, restul limitelor copiate din spices-dried', () => {

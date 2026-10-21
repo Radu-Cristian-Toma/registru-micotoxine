@@ -119,6 +119,24 @@ async function loadVerification() {
     }
 
     const b = data.bulletin;
+    if (b.detailLevel === 'minimal') {
+      document.getElementById('footer-note').textContent = '';
+      content.innerHTML = `
+        <div class="verify-status-banner valid">
+          <span class="icon">✓</span>
+          <div>${bt('verify.authenticIssuedAt')} ${escapeHtml(b.issuedAt || '—')}.</div>
+        </div>
+        <div class="bulletin">
+          <div class="field-grid">
+            <div class="field"><label>${bt('verify.bulletinNumberShort')}</label><div class="field-static">${escapeHtml(b.bulletinNo)}</div></div>
+            <div class="field"><label>${bt('verify.validationDate')}</label><div class="field-static">${escapeHtml(b.validatedAt || '—')}</div></div>
+            <div class="field"><label>${bt('verify.fingerprintLabel')}</label><div class="field-static mono" style="word-break:break-all;">${b.snapshotHash ? escapeHtml(b.snapshotHash) : bt('verify.noFingerprint')}</div></div>
+          </div>
+          <div class="section-hint" style="margin-top:14px;">${bt('verify.minimalNote')}</div>
+        </div>
+      `;
+      return;
+    }
     const isFail = b.status === 'fail';
 
     content.innerHTML = `

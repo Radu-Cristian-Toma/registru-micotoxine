@@ -20,6 +20,8 @@ const required = [
   'db/session-store.js',
   'config.js',
   'scripts/backup-db.js',
+  'scripts/verify-integrity.js',
+  'db/audit.js',
   'public/index.html',
   'public/app.js',
   'public/i18n.js',

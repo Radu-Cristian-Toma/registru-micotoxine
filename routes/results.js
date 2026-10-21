@@ -2,7 +2,65 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db/database');
 const { requireRole, requireSampleAccess } = require('../middleware/auth');
-const { evaluateResult, evaluateArchiveRow, RULE_PROFILES, getRuleProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
+const { evaluateResult, evaluateArchiveRow, decisionDetail, DECISION_RULES, PERFORMANCE_GROUPS, RULE_PROFILES, getRuleProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
+
+// --- Etapa B4: instantanee si versiuni ---------------------------------------
+const sha256 = (txt) => crypto.createHash('sha256').update(txt).digest('hex');
+
+// Starea unui rezultat, asa cum se pastreaza in result_versions (starea
+// DINAINTE de modificare). Un singur loc, ca PUT/validate/review sa nu divearga.
+function versionSnapshot(current) {
+  return {
+    afb1: current.afb1, afb2: current.afb2, afg1: current.afg1, afg2: current.afg2, ota: current.ota, m1: current.m1,
+    don: current.don, zea: current.zea, fum: current.fum,
+    limitAfb1: current.limit_afb1, limitAflaSum: current.limit_afla_sum, limitOta: current.limit_ota, limitM1: current.limit_m1,
+    limitDon: current.limit_don, limitZea: current.limit_zea, limitFum: current.limit_fum,
+    analysisDate: current.analysis_date, notes: current.notes, method: current.method, equipment: current.equipment, qcStatus: current.qc_status,
+    validationStatus: current.validation_status, bulletinNo: current.bulletin_no || null, bulletinIssuedAt: current.bulletin_issued_at || null,
+    reviewStatus: current.review_status || null,
+    decisionRule: current.decision_rule || null, methodPerformanceJson: current.method_performance_json || null,
+    limitProfileId: current.limit_profile_id || null, limitBasis: current.limit_basis || null, limitOverrideReason: current.limit_override_reason || null
+  };
+}
+
+function recordVersion(sampleId, current, reason, userId) {
+  const latest = db.prepare('SELECT COALESCE(MAX(version_no), 0) AS n FROM result_versions WHERE sample_id = ?').get(sampleId);
+  const json = JSON.stringify(versionSnapshot(current));
+  db.prepare(`INSERT INTO result_versions (sample_id, version_no, snapshot_json, snapshot_hash, change_reason, changed_by) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(sampleId, latest.n + 1, json, sha256(json), reason || null, userId);
+}
+
+// Continutul buletinului emis, fixat la momentul validarii. Imaginile
+// (logo, semnatura, stampila) se pastreaza doar ca amprenta SHA-256.
+function buildBulletinSnapshot(sampleId, userId) {
+  const row = db.prepare(`
+    SELECT r.*, s.code, s.product_name, s.category, s.sample_date, s.sampled_by, s.requested_tests
+    FROM results r JOIN samples s ON s.id = r.sample_id WHERE r.sample_id = ?`).get(sampleId);
+  const lab = db.prepare('SELECT * FROM lab_settings WHERE id = 1').get() || {};
+  const validator = db.prepare('SELECT id, full_name FROM users WHERE id = ?').get(userId) || {};
+  const imgHash = (v) => (v ? sha256(v) : null);
+  let requestedTests = null;
+  try { requestedTests = row.requested_tests ? JSON.parse(row.requested_tests) : null; } catch (_) { requestedTests = null; }
+  return {
+    schema: 1,
+    bulletinNo: row.bulletin_no, issuedAt: row.bulletin_issued_at,
+    sample: { code: row.code, productName: row.product_name, category: row.category, sampleDate: row.sample_date, sampledBy: row.sampled_by, requestedTests },
+    results: { afb1: row.afb1, afb2: row.afb2, afg1: row.afg1, afg2: row.afg2, ota: row.ota, m1: row.m1, don: row.don, zea: row.zea, fum: row.fum },
+    limits: { afb1: row.limit_afb1, aflaSum: row.limit_afla_sum, ota: row.limit_ota, m1: row.limit_m1, don: row.limit_don, zea: row.limit_zea, fum: row.limit_fum },
+    limitProvenance: { profileId: row.limit_profile_id, source: row.limit_source, regulationRef: row.limit_regulation_ref, basis: row.limit_basis, overrideReason: row.limit_override_reason },
+    analysis: { date: row.analysis_date, method: row.method, equipment: row.equipment, qcStatus: row.qc_status, notes: row.notes },
+    decision: decisionDetail(row),
+    review: { status: row.review_status, reviewedBy: row.reviewed_by, reviewedAt: row.reviewed_at },
+    operatorId: row.operator_id,
+    validation: { validatedBy: validator.id || null, validatedByName: validator.full_name || null, validatedAt: row.validated_at },
+    laboratory: {
+      institutionName: lab.institution_name || null, institutionAddress: lab.institution_address || null,
+      institutionEmail: lab.institution_email || null, institutionPhone: lab.institution_phone || null,
+      signatureName: lab.signature_name || null, signatureRole: lab.signature_role || null,
+      logoSha256: imgHash(lab.logo_data_url), signatureSha256: imgHash(lab.signature_data_url), stampSha256: imgHash(lab.stamp_data_url)
+    }
+  };
+}
 
 const router = express.Router();
 
@@ -52,6 +110,7 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
            s.is_control_sample AS isControlSample, s.operator_seen_state AS operatorSeenState,
            s.status, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.operator_id AS operatorId, r.review_status AS reviewStatus, r.reviewed_at AS reviewedAt, r.review_note AS reviewNote, ru.full_name AS reviewedByName,
@@ -70,7 +129,8 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
     const { requestedTestsJson, operatorSeenState, ...rest } = r;
     const computedStatus = evaluateResult({
       afb1: r.afb1, afb2: r.afb2, afg1: r.afg1, afg2: r.afg2, ota: r.ota, m1: r.m1, don: r.don, zea: r.zea, fum: r.fum,
-      limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, limit_m1: r.limitM1, limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus
+      limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, limit_m1: r.limitM1, limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus,
+      decision_rule: r.decisionRule, method_performance_json: r.methodPerformanceJson
     });
     // Notificare "Nou" comuna echipei operator/validator - vezi nota din
     // db/database.js despre alegerea de a nu tine starea per utilizator.
@@ -90,14 +150,14 @@ router.post('/:id/mark-seen', requireRole('operator', 'validator', 'admin'), (re
 
   const current = db.prepare(`
     SELECT afb1, afb2, afg1, afg2, ota, m1, don, zea, fum,
-           limit_afb1 AS limitAfb1, limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
+           decision_rule AS decisionRule, method_performance_json AS methodPerformanceJson, limit_afb1 AS limitAfb1, limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
            limit_don AS limitDon, limit_zea AS limitZea, limit_fum AS limitFum,
            review_status AS reviewStatus, validation_status AS validationStatus, qc_status AS qcStatus
     FROM results WHERE sample_id = ?
   `).get(req.params.id);
   const computedStatus = current ? evaluateResult({
     afb1: current.afb1, afb2: current.afb2, afg1: current.afg1, afg2: current.afg2, ota: current.ota, m1: current.m1, don: current.don, zea: current.zea, fum: current.fum,
-    limit_afb1: current.limitAfb1, limit_afla_sum: current.limitAflaSum, limit_ota: current.limitOta, limit_m1: current.limitM1, limit_don: current.limitDon, limit_zea: current.limitZea, limit_fum: current.limitFum, qc_status: current.qcStatus
+    limit_afb1: current.limitAfb1, limit_afla_sum: current.limitAflaSum, limit_ota: current.limitOta, limit_m1: current.limitM1, limit_don: current.limitDon, limit_zea: current.limitZea, limit_fum: current.limitFum, qc_status: current.qcStatus, decision_rule: current.decisionRule, method_performance_json: current.methodPerformanceJson
   }) : 'pending';
   const signature = `${computedStatus}|${current ? current.reviewStatus : 'pending'}|${current ? current.validationStatus : 'draft'}`;
 
@@ -116,6 +176,7 @@ router.get('/archive', requireRole('operator', 'validator', 'admin'), (req, res)
            s.sampled_by AS sampledBy, s.created_at AS createdAt,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
@@ -178,6 +239,7 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
            s.sampled_by AS sampledBy,
            u.full_name AS ownerName, u.email AS ownerEmail, u.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
@@ -260,7 +322,7 @@ router.get('/archive/export', requireRole('operator', 'validator', 'admin'), (re
 
 // Operatorul introduce/actualizeaza rezultatele pentru o proba anume.
 router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('sampleId'), (req, res) => {
-  const { afb1, afb2, afg1, afg2, ota, m1, don, zea, fum, analysisDate, notes, method, equipment, qcStatus, qcRejectionReason, intakeConfirmed, limitAfb1, limitAflaSum, limitOta, limitM1, limitDon, limitZea, limitFum, correctionReason } = req.body;
+  const { afb1, afb2, afg1, afg2, ota, m1, don, zea, fum, analysisDate, notes, method, equipment, qcStatus, qcRejectionReason, intakeConfirmed, limitAfb1, limitAflaSum, limitOta, limitM1, limitDon, limitZea, limitFum, correctionReason, limitChangeReason, decisionRule, methodPerformance } = req.body;
 
   const sample = db.prepare('SELECT id, requested_tests AS requestedTestsJson FROM samples WHERE id = ?').get(req.params.sampleId);
   if (!sample) return res.status(404).json({ error: 'Proba nu a fost găsită.' });
@@ -284,6 +346,40 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
       return res.status(400).json({ error: `Valoarea ${key} trebuie să fie numerică și nenegativă.` });
     }
   }
+
+  // Etapa B5: regula de decizie si performanta metodei (incertitudine extinsa
+  // relativa, k = 2, recuperare, LOQ), pe grup de analiza. Valorile sunt
+  // introduse de laborator din validarea metodei; aplicatia nu le inventeaza.
+  if (decisionRule !== undefined && decisionRule !== null && decisionRule !== '' && !DECISION_RULES.includes(decisionRule)) {
+    return res.status(400).json({ error: 'Regula de decizie trebuie să fie „simple” sau „reg_2782_u”.' });
+  }
+  let performanceJson = null;
+  if (methodPerformance !== undefined && methodPerformance !== null) {
+    if (typeof methodPerformance !== 'object' || Array.isArray(methodPerformance)) {
+      return res.status(400).json({ error: 'Performanța metodei trebuie să fie un obiect pe grupuri de analiză.' });
+    }
+    const clean = {};
+    const range = { loq: [0, Infinity, true], recoveryPct: [0, 200, false], uRelPct: [0, 100, true] };
+    for (const [group, vals] of Object.entries(methodPerformance)) {
+      if (!PERFORMANCE_GROUPS.includes(group) || !vals || typeof vals !== 'object') {
+        return res.status(400).json({ error: `Grup de analiză necunoscut în performanța metodei: ${group}.` });
+      }
+      clean[group] = {};
+      for (const [field, [min, max, minInclusive]] of Object.entries(range)) {
+        const raw = vals[field];
+        if (raw === undefined || raw === null || raw === '') continue;
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < min || n > max || (!minInclusive && n === min) || (field === 'uRelPct' && n >= 100)) {
+          return res.status(400).json({ error: `Valoare invalidă pentru ${group}.${field}.` });
+        }
+        clean[group][field] = n;
+      }
+    }
+    performanceJson = JSON.stringify(clean);
+  }
+  const storedRule = DECISION_RULES.includes(current.decision_rule) ? current.decision_rule : 'simple';
+  const effectiveDecisionRule = decisionRule ? decisionRule : storedRule;
+  const effectivePerformanceJson = performanceJson !== null ? performanceJson : (current.method_performance_json || null);
 
   // QC respins anuleaza proba - beneficiarul trebuie sa vada de ce, nu doar
   // "ceva s-a schimbat". Motivul e obligatoriu, nu optional.
@@ -345,6 +441,7 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
       limit_afb1: pick(maskedLimitAfb1, current.limit_afb1), limit_afla_sum: pick(maskedLimitAflaSum, current.limit_afla_sum), limit_ota: pick(maskedLimitOta, current.limit_ota),
       limit_m1: pick(maskedLimitM1, current.limit_m1), limit_don: pick(maskedLimitDon, current.limit_don), limit_zea: pick(maskedLimitZea, current.limit_zea), limit_fum: pick(maskedLimitFum, current.limit_fum),
       qc_status: effectiveQcStatus,
+      decision_rule: effectiveDecisionRule, method_performance_json: effectivePerformanceJson,
     });
     if (effectiveStatus === 'pending' || effectiveStatus === 'in_analysis') {
       return res.status(400).json({ error: 'Rezultatele nu sunt complete încă — proba nu poate fi trimisă spre validare cu control de calitate decis. Completează toate valorile analitice mai întâi.' });
@@ -366,24 +463,33 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
     }
   }
 
+  // L5: orice modificare manuala a unei limite fata de valoarea stocata (inclusiv
+  // setarea unei limite inca necompletate) cere un motiv scris; motivul, baza
+  // 'manual' si valorile vechi/noi raman in rezultat si in jurnalul de audit.
+  const limitPairs = [
+    ['afb1', maskedLimitAfb1, current.limit_afb1], ['aflaSum', maskedLimitAflaSum, current.limit_afla_sum],
+    ['ota', maskedLimitOta, current.limit_ota], ['m1', maskedLimitM1, current.limit_m1],
+    ['don', maskedLimitDon, current.limit_don], ['zea', maskedLimitZea, current.limit_zea], ['fum', maskedLimitFum, current.limit_fum],
+  ];
+  const limitChanges = {};
+  for (const [key, incoming, stored] of limitPairs) {
+    const n = toNum(incoming);
+    if (n !== null && n !== stored) limitChanges[key] = { from: stored ?? null, to: n };
+  }
+  const limitReasonText = String(limitChangeReason || '').trim();
+  const ruleChanged = effectiveDecisionRule !== storedRule;
+  if (ruleChanged && !limitReasonText) {
+    return res.status(400).json({ error: 'Schimbarea regulii de decizie modifică verdictul de conformitate și necesită un motiv scris (câmpul „Motivul modificării limitelor”).' });
+  }
+  if (Object.keys(limitChanges).length && !limitReasonText) {
+    return res.status(400).json({ error: 'Modificarea manuală a limitelor legale necesită un motiv scris (câmpul „Motivul modificării limitelor”).' });
+  }
+
   let newStatus;
   const reason = String(correctionReason || '').trim() || null;
 
   const save = db.transaction(() => {
-    const snapshot = {
-      afb1: current.afb1, afb2: current.afb2, afg1: current.afg1, afg2: current.afg2, ota: current.ota, m1: current.m1,
-      don: current.don, zea: current.zea, fum: current.fum,
-      limitAfb1: current.limit_afb1, limitAflaSum: current.limit_afla_sum, limitOta: current.limit_ota, limitM1: current.limit_m1,
-      limitDon: current.limit_don, limitZea: current.limit_zea, limitFum: current.limit_fum,
-      analysisDate: current.analysis_date, notes: current.notes, method: current.method, equipment: current.equipment, qcStatus: current.qc_status,
-      validationStatus: current.validation_status, bulletinNo: current.bulletin_no || null, bulletinIssuedAt: current.bulletin_issued_at || null
-    };
-    const latest = db.prepare('SELECT COALESCE(MAX(version_no), 0) AS n FROM result_versions WHERE sample_id = ?').get(req.params.sampleId);
-    const versionNo = latest.n + 1;
-    const snapshotJson = JSON.stringify(snapshot);
-    const hash = crypto.createHash('sha256').update(snapshotJson).digest('hex');
-    db.prepare(`INSERT INTO result_versions (sample_id, version_no, snapshot_json, snapshot_hash, change_reason, changed_by) VALUES (?, ?, ?, ?, ?, ?)` )
-      .run(req.params.sampleId, versionNo, snapshotJson, hash, reason, req.session.user.id);
+    recordVersion(req.params.sampleId, current, reason, req.session.user.id);
 
     db.prepare(`
     UPDATE results SET
@@ -397,6 +503,9 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
       limit_zea = COALESCE(?, limit_zea),
       limit_fum = COALESCE(?, limit_fum),
       analysis_date = COALESCE(?, analysis_date), notes = COALESCE(?, notes), method = COALESCE(?, method), equipment = COALESCE(?, equipment),
+      decision_rule = ?, method_performance_json = ?,
+      limit_basis = CASE WHEN ? = 1 THEN 'manual' ELSE limit_basis END,
+      limit_override_reason = CASE WHEN ? = 1 THEN ? ELSE limit_override_reason END,
       qc_status = COALESCE(?, qc_status), qc_rejection_reason = ?,
       intake_checked_at = COALESCE(intake_checked_at, CASE WHEN ? = 1 THEN datetime('now', 'localtime') ELSE NULL END), operator_id = ?,
       validation_status = 'draft', validated_by = NULL, validated_at = NULL, bulletin_no = NULL, bulletin_issued_at = NULL,
@@ -406,13 +515,16 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
   `).run(
     toNum(maskedAfb1), toNum(maskedAfb2), toNum(maskedAfg1), toNum(maskedAfg2), toNum(maskedOta), toNum(maskedM1), toNum(maskedDon), toNum(maskedZea), toNum(maskedFum),
     toNum(maskedLimitAfb1), toNum(maskedLimitAflaSum), toNum(maskedLimitOta), toNum(maskedLimitM1), toNum(maskedLimitDon), toNum(maskedLimitZea), toNum(maskedLimitFum),
-    analysisDate || null, notes || null, method || null, equipment || null, ['pending','accepted','not_required','rejected'].includes(qcStatus) ? qcStatus : null,
+    analysisDate || null, notes || null, method || null, equipment || null,
+    effectiveDecisionRule, effectivePerformanceJson,
+    Object.keys(limitChanges).length ? 1 : 0, Object.keys(limitChanges).length ? 1 : 0, limitReasonText,
+    ['pending','accepted','not_required','rejected'].includes(qcStatus) ? qcStatus : null,
     qcStatus === 'rejected' ? qcRejectionReason.trim() : null, intakeConfirmed ? 1 : 0, req.session.user.id,
     req.params.sampleId
   );
 
   const updated = db.prepare(`
-    SELECT afb1, afb2, afg1, afg2, ota, m1, don, zea, fum, limit_afb1 AS limitAfb1,
+    SELECT afb1, afb2, afg1, afg2, ota, m1, don, zea, fum, decision_rule AS decisionRule, method_performance_json AS methodPerformanceJson, limit_afb1 AS limitAfb1,
            limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
            limit_don AS limitDon, limit_zea AS limitZea, limit_fum AS limitFum, qc_status AS qcStatus
     FROM results WHERE sample_id = ?
@@ -422,7 +534,7 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
     afb1: updated.afb1, afb2: updated.afb2, afg1: updated.afg1, afg2: updated.afg2, ota: updated.ota, m1: updated.m1,
     don: updated.don, zea: updated.zea, fum: updated.fum,
     limit_afb1: updated.limitAfb1, limit_afla_sum: updated.limitAflaSum, limit_ota: updated.limitOta, limit_m1: updated.limitM1,
-    limit_don: updated.limitDon, limit_zea: updated.limitZea, limit_fum: updated.limitFum, qc_status: updated.qcStatus
+    limit_don: updated.limitDon, limit_zea: updated.limitZea, limit_fum: updated.limitFum, qc_status: updated.qcStatus, decision_rule: updated.decisionRule, method_performance_json: updated.methodPerformanceJson
   });
 
   db.prepare('UPDATE samples SET status = ? WHERE id = ?').run(newStatus, req.params.sampleId);
@@ -430,6 +542,12 @@ router.put('/:sampleId', requireRole('operator', 'admin'), requireSampleAccess('
   const auditDetails = JSON.stringify({
     results: { afb1: updated.afb1, afb2: updated.afb2, afg1: updated.afg1, afg2: updated.afg2, ota: updated.ota, m1: updated.m1, don: updated.don, zea: updated.zea, fum: updated.fum },
     limits: { afb1: updated.limitAfb1, aflaSum: updated.limitAflaSum, ota: updated.limitOta, m1: updated.limitM1, don: updated.limitDon, zea: updated.limitZea, fum: updated.limitFum },
+    decisionRule: effectiveDecisionRule,
+    decisionRuleChanged: ruleChanged ? { from: storedRule, to: effectiveDecisionRule, reason: limitReasonText } : undefined,
+    methodPerformance: performanceJson !== null ? JSON.parse(performanceJson) : undefined,
+    limitProfileId: current.limit_profile_id || null,
+    limitBasis: Object.keys(limitChanges).length ? 'manual' : (current.limit_basis || null),
+    limitChanges: Object.keys(limitChanges).length ? { changes: limitChanges, reason: limitReasonText } : undefined,
     method: method || null,
     qcStatus: qcStatus || null,
     status: newStatus
@@ -524,10 +642,18 @@ router.post('/:sampleId/validate', requireRole('validator', 'admin'), requireSam
       if (m) next = Math.max(next, parseInt(m[1], 10) + 1);
     }
     const no = `BUL-${year}-${String(next).padStart(5, '0')}`;
+    recordVersion(req.params.sampleId, row, 'validare: emitere buletin', req.session.user.id);
     db.prepare(`UPDATE results SET validation_status = 'validated', validated_by = ?, validated_at = datetime('now', 'localtime'), bulletin_no = ?, bulletin_issued_at = datetime('now', 'localtime') WHERE sample_id = ?`)
       .run(req.session.user.id, no, req.params.sampleId);
     db.prepare(`INSERT INTO audit_log (sample_id, user_id, action, details) VALUES (?, ?, ?, ?)`)
       .run(req.params.sampleId, req.session.user.id, 'result_validated', JSON.stringify({ status: resultStatus, bulletinNo: no }));
+    const snap = buildBulletinSnapshot(req.params.sampleId, req.session.user.id);
+    const snapJson = JSON.stringify(snap);
+    const snapHash = sha256(snapJson);
+    db.prepare('INSERT INTO bulletin_snapshots (sample_id, bulletin_no, snapshot_json, snapshot_hash, issued_by) VALUES (?, ?, ?, ?, ?)')
+      .run(req.params.sampleId, no, snapJson, snapHash, req.session.user.id);
+    db.prepare(`INSERT INTO audit_log (sample_id, user_id, action, details) VALUES (?, ?, ?, ?)`)
+      .run(req.params.sampleId, req.session.user.id, 'bulletin_snapshot_stored', JSON.stringify({ bulletinNo: no, snapshotSha256: snapHash }));
     return no;
   })();
   res.json({ ok: true, validationStatus: 'validated', bulletinNo });
@@ -569,6 +695,7 @@ router.post('/:sampleId/review', requireRole('validator', 'admin'), requireSampl
     return res.status(400).json({ error: 'Rezultatele nu sunt complete încă — nu pot fi aprobate. Poți respinge proba pentru a o retrimite operatorului.' });
   }
 
+  recordVersion(req.params.sampleId, current, `revizuire: ${decision}`, req.session.user.id);
   db.prepare(`UPDATE results SET review_status = ?, reviewed_by = ?, reviewed_at = datetime('now', 'localtime'), review_note = ? WHERE sample_id = ?`)
     .run(decision, req.session.user.id, String(note || '').trim() || null, req.params.sampleId);
 
@@ -606,7 +733,7 @@ router.get('/:sampleId/versions', requireRole('owner', 'operator', 'validator', 
 
   const current = db.prepare(`
     SELECT afb1, afb2, afg1, afg2, ota, m1, don, zea, fum,
-           limit_afb1 AS limitAfb1, limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
+           decision_rule AS decisionRule, method_performance_json AS methodPerformanceJson, limit_afb1 AS limitAfb1, limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
            limit_don AS limitDon, limit_zea AS limitZea, limit_fum AS limitFum,
            analysis_date AS analysisDate, notes, method, qc_status AS qcStatus,
            validation_status AS validationStatus, bulletin_no AS bulletinNo, bulletin_issued_at AS bulletinIssuedAt
@@ -750,6 +877,7 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
            r.validation_status AS validationStatus, r.validated_at AS validatedAt,
            r.analysis_date AS analysisDate, r.method, r.equipment,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            s.code, s.product_name AS productName, s.category, s.status, s.requested_tests AS requestedTestsJson,
            u.full_name AS validatedByName
@@ -766,8 +894,19 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
   let requestedTests = null;
   try { requestedTests = row.requestedTestsJson ? JSON.parse(row.requestedTestsJson) : null; } catch (_) { requestedTests = null; }
 
+  // Pagina publica (QR) confirma doar autenticitatea buletinului: numar, date,
+  // amprenta SHA-256 a instantaneului emis. Rezultatele analitice NU sunt
+  // expuse public, decat daca laboratorul activeaza explicit
+  // LIMS_PUBLIC_VERIFY_RESULTS=1 (Etapa B4, L18).
+  const snap = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE bulletin_no = ?').get(row.bulletinNo);
+  const snapshotHash = snap ? snap.snapshot_hash : null;
+  if (process.env.LIMS_PUBLIC_VERIFY_RESULTS !== '1') {
+    return res.json({ bulletin: { detailLevel: 'minimal', bulletinNo: row.bulletinNo, issuedAt: row.issuedAt, validatedAt: row.validatedAt, snapshotHash } });
+  }
   res.json({
     bulletin: {
+      detailLevel: 'full',
+      snapshotHash,
       bulletinNo: row.bulletinNo,
       issuedAt: row.issuedAt,
       code: row.code,
@@ -789,6 +928,15 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
       }
     }
   });
+});
+
+// Instantaneul buletinului emis + verificarea amprentei (doar utilizatori
+// autentificati cu acces la proba).
+router.get('/:sampleId/bulletin-snapshot', requireRole('owner', 'operator', 'validator', 'admin'), requireSampleAccess('sampleId'), (req, res) => {
+  const row = db.prepare('SELECT snapshot_json, snapshot_hash, bulletin_no, issued_at FROM bulletin_snapshots WHERE sample_id = ?').get(req.params.sampleId);
+  if (!row) return res.status(404).json({ error: 'Pentru această probă nu există un instantaneu de buletin (nevalidată sau emisă înainte de introducerea instantaneelor).' });
+  const intact = sha256(row.snapshot_json) === row.snapshot_hash;
+  res.json({ bulletinNo: row.bulletin_no, issuedAt: row.issued_at, snapshotSha256: row.snapshot_hash, integrity: intact ? 'ok' : 'mismatch', snapshot: JSON.parse(row.snapshot_json) });
 });
 
 module.exports = router;

@@ -8,7 +8,8 @@
     "seed-admin": "node db/seed-admin.js",
     "release-check": "node scripts/release-check.js",
     "backup": "node scripts/backup-db.js",
-    "test": "node --test \"test/unit/*.test.js\""
+    "test": "node --test \"test/unit/*.test.js\"",
+    "verify-integrity": "node scripts/verify-integrity.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.0",

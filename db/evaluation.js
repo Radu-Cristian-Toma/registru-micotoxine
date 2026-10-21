@@ -201,10 +201,80 @@ const RULE_PROFILES = [
     limit_afb1: null, limit_afla_sum: null, limit_ota: null, limit_m1: 0.050,
     // verificat de Hermes 17.10.2026; de reconfirmat de laborator pe textul oficial
     source: 'Regulamentul (UE) 2023/915, Anexa I, pct. 1.1.16 (aflatoxina M1)'
+  },
+  // ---- Etapa B (revizia 2 a auditului, L23/L24): profiluri adaugate dupa confruntarea cu Anexa I
+  // a Reg. (UE) 2023/915, versiunea consolidata 02023R0915-20250101. Verificat 21.10.2026 prin
+  // citirea paginii EUR-Lex (rezumat automat) - de reconfirmat de laborator pe textul oficial.
+  // Aceste profiluri sunt atinse prin eticheta exacta sau prin rafinarea din REFINEMENTS (mai jos).
+  {
+    id: 'cereal-milling-products',
+    label: 'Produse de măcinare a cerealelor (făină, griș) pentru consumatorul final',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 3.0,
+    limit_don: 600, limit_zea: 75, limit_fum: null,
+    source: 'Reg. (UE) 2023/915, Anexa I: AFB1/sumă pct. 1.1.12; OTA pct. 1.2.10; DON pct. 1.4.5 (produse de măcinare a cerealelor, exclusiv porumb și orez); ZEA pct. 1.5.3 (inclusiv făină și griș)'
+  },
+  {
+    id: 'dried-vine-fruit-final',
+    label: 'Fructe de vită-de-vie uscate pentru consumatorul final (stafide, coarințe, sultanine)',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 8.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.2 și 1.2.1.1 (fructe de vită-de-vie uscate: coarințe, stafide, sultanine)'
+  },
+  {
+    id: 'dried-vine-fruit-sorting',
+    label: 'Fructe de vită-de-vie uscate înainte de sortare / alt tratament fizic',
+    keywords: [],
+    limit_afb1: 5.0, limit_afla_sum: 10.0, limit_ota: 8.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.1 și 1.2.1.1'
+  },
+  {
+    id: 'durum-wheat-unprocessed',
+    label: 'Grâu dur neprocesat pentru prima etapă de procesare',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 5.0,
+    limit_don: 1500, limit_zea: 100, limit_fum: null,
+    source: 'Reg. (UE) 2023/915, Anexa I: AFB1/sumă pct. 1.1.12; OTA pct. 1.2.9; DON pct. 1.4.2 (grâu dur neprocesat); ZEA pct. 1.5.1'
+  },
+  {
+    id: 'oats-unprocessed',
+    label: 'Ovăz neprocesat (cu pleavă) pentru prima etapă de procesare',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 5.0,
+    limit_don: 1750, limit_zea: 100, limit_fum: null,
+    source: 'Reg. (UE) 2023/915, Anexa I: AFB1/sumă pct. 1.1.12; OTA pct. 1.2.9 (la ovăz, boabe cu pleavă); DON pct. 1.4.3 (ovăz neprocesat cu pleavă necomestibilă, pleava inclusă în măsurare); ZEA pct. 1.5.1'
+  },
+  {
+    id: 'oilseeds-ota-final',
+    label: 'Semințe de floarea-soarelui, dovleac, pepene, cânepă și boabe de soia pentru consumatorul final',
+    keywords: [],
+    limit_afb1: 2.0, limit_afla_sum: 4.0, limit_ota: 5.0,
+    source: 'Reg. (UE) 2023/915, Anexa I: aflatoxine pct. 1.1.5 (arahide și alte semințe oleaginoase); OTA pct. 1.2.8'
+  },
+  {
+    id: 'pistachios-sorting',
+    label: 'Fistic înainte de sortare / tratament fizic',
+    keywords: [],
+    limit_afb1: 12.0, limit_afla_sum: 15.0, limit_ota: 10.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.8 (aflatoxine) și 1.2.3 (OTA)'
+  },
+  {
+    id: 'pistachios-final',
+    label: 'Fistic pentru consumatorul final',
+    keywords: [],
+    limit_afb1: 8.0, limit_afla_sum: 10.0, limit_ota: 5.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.1.9 (aflatoxine) și 1.2.4 (OTA)'
+  },
+  {
+    id: 'instant-coffee',
+    label: 'Cafea solubilă (instant)',
+    keywords: [],
+    limit_afb1: null, limit_afla_sum: null, limit_ota: 5.0,
+    source: 'Reg. (UE) 2023/915, Anexa I, pct. 1.2.15'
   }
 ];
 
-function getRuleProfile(category = '', productName = '') {
+function baseGetRuleProfile(category = '', productName = '') {
   const text = `${category} ${productName}`.toLowerCase();
 
   // Verificare prioritara: daca textul contine eticheta EXACTA a unui profil
@@ -255,6 +325,109 @@ function getRuleProfile(category = '', productName = '') {
   return null;
 }
 
+// Rafinari: cand profilul general ales (prin eticheta sau cuvinte-cheie) are o subcategorie cu
+// limite proprii in Anexa I, produsul numit explicit in text trece la profilul specific.
+// Exemple verificate: faina (DON 600, nu 750), stafide (OTA 8, nu 2), grau dur / ovaz neprocesat
+// (DON 1500 / 1750), semintele de floarea-soarelui etc. (OTA 5), fisticul (OTA 5 / 10),
+// cafeaua solubila (OTA 5). Sursa: Anexa I a Reg. (UE) 2023/915, vezi profilurile de mai sus.
+const REFINEMENTS = [
+  { from: ['cereals-final-consumer'], to: 'cereal-milling-products', keywords: ['făină', 'faina', 'farina', 'griș', 'gris', 'semolină', 'semolina'], unless: /porumb|orez/ },
+  { from: ['dried-fruit-final'], to: 'dried-vine-fruit-final', keywords: ['stafid', 'coarin', 'sultanin', 'struguri uscați', 'struguri uscati'] },
+  { from: ['dried-fruit-sorting'], to: 'dried-vine-fruit-sorting', keywords: ['stafid', 'coarin', 'sultanin', 'struguri uscați', 'struguri uscati'] },
+  { from: ['unprocessed-cereals'], to: 'durum-wheat-unprocessed', keywords: ['grâu dur', 'grau dur', 'durum'] },
+  { from: ['unprocessed-cereals'], to: 'oats-unprocessed', keywords: ['ovăz', 'ovaz'] },
+  { from: ['peanuts-oilseeds-final'], to: 'oilseeds-ota-final', keywords: ['floarea soarelui', 'floarea-soarelui', 'semințe de dovleac', 'seminte de dovleac', 'semințe de pepene', 'seminte de pepene', 'cânepă', 'canepa', 'soia'] },
+  { from: ['almonds-pistachios-apricot-sorting'], to: 'pistachios-sorting', keywords: ['fistic'], unless: /migdale|sâmbur|sambur|caise/ },
+  { from: ['almonds-pistachios-apricot-final'], to: 'pistachios-final', keywords: ['fistic'], unless: /migdale|sâmbur|sambur|caise/ },
+  { from: ['roasted-coffee'], to: 'instant-coffee', keywords: ['solubil', 'instant'] }
+];
+
+function getRuleProfile(category = '', productName = '') {
+  const text = `${category} ${productName}`.toLowerCase();
+  const profile = baseGetRuleProfile(category, productName);
+  for (const r of REFINEMENTS) {
+    // Rafinarea se aplica peste profilul general gasit sau, daca textul liber nu
+    // a dus la niciun profil general, direct pe cuvintele-cheie specifice.
+    if (profile && !r.from.includes(profile.id)) continue;
+    if (r.unless && r.unless.test(text)) continue;
+    if (r.keywords.some(k => text.includes(k))) {
+      const target = RULE_PROFILES.find(x => x.id === r.to);
+      if (target) return target;
+    }
+  }
+  return profile;
+}
+
+// --- Etapa B5 (L2, L3, L4): regula de decizie si performanta metodei -----------
+// Regula implicita 'simple' pastreaza comportamentul anterior: depasire daca
+// valoarea > limita, fara incertitudine. Regula 'reg_2782_u' aplica regula de
+// acceptare din Reg. (UE) 2023/2782, anexa I (loturi: respingere doar daca
+// valoarea [corectata pentru recuperare] minus incertitudinea extinsa depaseste
+// limita maxima) [formularea exacta de reverificat pe EUR-Lex inainte de
+// utilizare reala]. Incertitudinea extinsa este relativa (%), k = 2, pe grup de
+// analiza; pentru suma aflatoxinelor se foloseste valoarea grupului
+// 'aflatoxins' [de verificat metrologic de laborator].
+const DECISION_RULES = ['simple', 'reg_2782_u'];
+const PERFORMANCE_GROUPS = ['aflatoxins', 'ota', 'm1', 'don', 'zea', 'fum'];
+const ANALYTE_GROUP = { afb1: 'aflatoxins', afb2: 'aflatoxins', afg1: 'aflatoxins', afg2: 'aflatoxins', aflaSum: 'aflatoxins', ota: 'ota', m1: 'm1', don: 'don', zea: 'zea', fum: 'fum' };
+
+function parsePerformance(result) {
+  let p = result.method_performance;
+  if (!p && result.method_performance_json) {
+    try { p = JSON.parse(result.method_performance_json); } catch (_) { p = null; }
+  }
+  return p && typeof p === 'object' ? p : {};
+}
+function decisionRuleOf(result) {
+  const r = result.decision_rule;
+  return DECISION_RULES.includes(r) ? r : 'simple';
+}
+
+// Verdict pe analit: 'conform' | 'non_conform' | 'within_uncertainty' (valoare
+// peste limita, dar limita este in intervalul valoare ± U - acceptat de regula
+// reg_2782_u, semnalat explicit) | null (fara valoare sau fara limita).
+function judge(value, limit, rule, uRelPct) {
+  if (value === null || value === undefined || limit === null || limit === undefined) return null;
+  if (!(value > limit)) return 'conform';
+  if (rule === 'reg_2782_u' && Number.isFinite(uRelPct) && uRelPct > 0) {
+    const uAbs = value * uRelPct / 100;
+    return (value - uAbs > limit) ? 'non_conform' : 'within_uncertainty';
+  }
+  return 'non_conform';
+}
+
+function exceeds(result, key, limit, value) {
+  const rule = decisionRuleOf(result);
+  const perf = parsePerformance(result);
+  const g = perf[ANALYTE_GROUP[key]] || {};
+  return judge(value, limit, rule, Number(g.uRelPct)) === 'non_conform';
+}
+
+// Detaliu de decizie per analit (pentru buletin/audit): valoare, limita,
+// performanta metodei, "<LOQ" si verdict, dupa regula de decizie a probei.
+function decisionDetail(result) {
+  const rule = decisionRuleOf(result);
+  const perf = parsePerformance(result);
+  const limitOf = { afb1: result.limit_afb1, aflaSum: result.limit_afla_sum, ota: result.limit_ota, m1: result.limit_m1, don: result.limit_don, zea: result.limit_zea, fum: result.limit_fum };
+  const afVals = [result.afb1, result.afb2, result.afg1, result.afg2];
+  const sum = afVals.every(v => v !== null && v !== undefined) ? afVals.reduce((a, b) => a + b, 0) : null;
+  const values = { afb1: result.afb1, aflaSum: sum, ota: result.ota, m1: result.m1, don: result.don, zea: result.zea, fum: result.fum };
+  const rows = {};
+  for (const key of Object.keys(values)) {
+    const g = perf[ANALYTE_GROUP[key]] || {};
+    const uRelPct = Number.isFinite(Number(g.uRelPct)) && g.uRelPct !== null && g.uRelPct !== '' ? Number(g.uRelPct) : null;
+    const loq = Number.isFinite(Number(g.loq)) && g.loq !== null && g.loq !== '' ? Number(g.loq) : null;
+    const value = values[key];
+    rows[key] = {
+      value: value ?? null, limit: limitOf[key] ?? null, uRelPct, uK: uRelPct === null ? null : 2,
+      recoveryPct: Number.isFinite(Number(g.recoveryPct)) && g.recoveryPct !== null && g.recoveryPct !== '' ? Number(g.recoveryPct) : null,
+      loq, belowLoq: loq !== null && value !== null && value !== undefined && value < loq,
+      verdict: judge(value, limitOf[key], rule, uRelPct)
+    };
+  }
+  return { rule, rows };
+}
+
 function evaluateResult(result) {
   if (!result) return 'pending';
   // QC respins inseamna ca proba nu poate fi evaluata normal, indiferent de
@@ -288,19 +461,19 @@ function evaluateResult(result) {
   const allEntered = relevantFields.every(f => result[f] !== null && result[f] !== undefined);
 
   let anyOver = false;
-  if (result.afb1 !== null && result.limit_afb1 !== null && result.afb1 > result.limit_afb1) anyOver = true;
-  if (result.ota !== null && result.limit_ota !== null && result.ota > result.limit_ota) anyOver = true;
-  if (result.limit_m1 !== null && result.limit_m1 !== undefined && result.m1 !== null && result.m1 !== undefined && result.m1 > result.limit_m1) anyOver = true;
-  if (result.limit_don !== null && result.limit_don !== undefined && result.don !== null && result.don !== undefined && result.don > result.limit_don) anyOver = true;
-  if (result.limit_zea !== null && result.limit_zea !== undefined && result.zea !== null && result.zea !== undefined && result.zea > result.limit_zea) anyOver = true;
-  if (result.limit_fum !== null && result.limit_fum !== undefined && result.fum !== null && result.fum !== undefined && result.fum > result.limit_fum) anyOver = true;
+  if (result.afb1 !== null && result.limit_afb1 !== null && exceeds(result, 'afb1', result.limit_afb1, result.afb1)) anyOver = true;
+  if (result.ota !== null && result.limit_ota !== null && exceeds(result, 'ota', result.limit_ota, result.ota)) anyOver = true;
+  if (result.limit_m1 !== null && result.limit_m1 !== undefined && result.m1 !== null && result.m1 !== undefined && exceeds(result, 'm1', result.limit_m1, result.m1)) anyOver = true;
+  if (result.limit_don !== null && result.limit_don !== undefined && result.don !== null && result.don !== undefined && exceeds(result, 'don', result.limit_don, result.don)) anyOver = true;
+  if (result.limit_zea !== null && result.limit_zea !== undefined && result.zea !== null && result.zea !== undefined && exceeds(result, 'zea', result.limit_zea, result.zea)) anyOver = true;
+  if (result.limit_fum !== null && result.limit_fum !== undefined && result.fum !== null && result.fum !== undefined && exceeds(result, 'fum', result.limit_fum, result.fum)) anyOver = true;
 
   if (aflaSumRelevant) {
     const afVals = [result.afb1, result.afb2, result.afg1, result.afg2];
     const afAllEntered = afVals.every(v => v !== null && v !== undefined);
     if (afAllEntered) {
       const sum = afVals.reduce((a, b) => a + b, 0);
-      if (sum > result.limit_afla_sum) anyOver = true;
+      if (exceeds(result, 'aflaSum', result.limit_afla_sum, sum)) anyOver = true;
     }
   }
 
@@ -317,7 +490,8 @@ function evaluateArchiveRow(r) {
   return evaluateResult({
     afb1: r.afb1, afb2: r.afb2, afg1: r.afg1, afg2: r.afg2, ota: r.ota, m1: r.m1, don: r.don, zea: r.zea, fum: r.fum,
     limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, limit_m1: r.limitM1,
-    limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus
+    limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus,
+    decision_rule: r.decisionRule, method_performance_json: r.methodPerformanceJson
   });
 }
 
@@ -345,4 +519,8 @@ function availableGroupsForProfile(profile) {
   return groups;
 }
 
-module.exports = { DEFAULT_LIMITS, RULE_PROFILES, getRuleProfile, evaluateResult, evaluateArchiveRow, TEST_GROUP_KEYS, availableGroupsForProfile };
+// Referinta de reglementare pentru profilurile de limite (Etapa B2, L5).
+const LIMIT_REGULATION_REF = 'Reg. (UE) 2023/915, versiunea consolidată 02023R0915-20250101 [de reconfirmat înainte de utilizare reală]';
+
+module.exports = {
+  LIMIT_REGULATION_REF, DECISION_RULES, PERFORMANCE_GROUPS, decisionDetail, DEFAULT_LIMITS, RULE_PROFILES, getRuleProfile, evaluateResult, evaluateArchiveRow, TEST_GROUP_KEYS, availableGroupsForProfile };

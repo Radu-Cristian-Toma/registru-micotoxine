@@ -210,6 +210,22 @@ if (resultsTableInfo && resultsTableInfo.sql.includes('limit_afb1 REAL DEFAULT 2
   `);
 }
 
+// Etapa B2 (L5): provenienta limitelor aplicate fiecarui rezultat. Profilul,
+// sursa si baza (profile / fallback / none / manual) raman scrise pe rezultat,
+// ca decizia de conformitate sa poata fi reconstituita ulterior chiar daca
+// profilurile din cod se schimba. Randurile vechi raman NULL (nedocumentat).
+const resultsColumnsB2 = db.prepare(`PRAGMA table_info(results)`).all().map(c => c.name);
+for (const col of ['limit_profile_id', 'limit_source', 'limit_regulation_ref', 'limit_basis', 'limit_override_reason']) {
+  if (!resultsColumnsB2.includes(col)) db.exec(`ALTER TABLE results ADD COLUMN ${col} TEXT`);
+}
+
+// Etapa B5 (L2-L4): regula de decizie si performanta metodei pe rezultat.
+// decision_rule NULL = 'simple' (comportamentul anterior, neschimbat).
+const resultsColumnsB5 = db.prepare(`PRAGMA table_info(results)`).all().map(c => c.name);
+for (const col of ['decision_rule', 'method_performance_json']) {
+  if (!resultsColumnsB5.includes(col)) db.exec(`ALTER TABLE results ADD COLUMN ${col} TEXT`);
+}
+
 const sampleColumns = db.prepare(`PRAGMA table_info(samples)`).all().map(c => c.name);
 if (!sampleColumns.includes('haccp_intended_use')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_intended_use TEXT`);
 if (!sampleColumns.includes('haccp_hazard')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_hazard TEXT`);
@@ -377,19 +393,93 @@ if (!labSettingsColumns.includes('institution_email')) db.exec(`ALTER TABLE lab_
 // nu doar de statusul probei. Optional, alaturi de email.
 if (!labSettingsColumns.includes('institution_phone')) db.exec(`ALTER TABLE lab_settings ADD COLUMN institution_phone TEXT`);
 
+// Etapa B3 (L7, L8): jurnalul de audit si istoricul versiunilor devin
+// append-only la nivel de baza de date, iar evenimentele fara proba (conturi,
+// setari, teste de validare) pot fi jurnalizate (sample_id NULL). SQLite nu
+// poate elimina NOT NULL dintr-o coloana, deci tabelul se reconstruieste o
+// singura data (idempotent: daca sample_id e deja nullable, nu se face nimic).
+const auditInfo = db.prepare(`PRAGMA table_info(audit_log)`).all();
+const auditSampleCol = auditInfo.find(c => c.name === 'sample_id');
+if (auditSampleCol && auditSampleCol.notnull === 1) {
+  try {
+  db.exec(`
+    DROP TRIGGER IF EXISTS audit_log_no_update;
+    DROP TRIGGER IF EXISTS audit_log_no_delete;
+    DROP TABLE IF EXISTS audit_log_new;
+    BEGIN;
+    CREATE TABLE audit_log_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sample_id INTEGER,
+      user_id INTEGER,
+      action TEXT NOT NULL,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (sample_id) REFERENCES samples(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    INSERT INTO audit_log_new (id, sample_id, user_id, action, details, created_at)
+      SELECT id, sample_id, user_id, action, details, created_at FROM audit_log;
+    DROP TABLE audit_log;
+    ALTER TABLE audit_log_new RENAME TO audit_log;
+    CREATE INDEX IF NOT EXISTS idx_audit_log_sample ON audit_log(sample_id, created_at DESC);
+    COMMIT;
+  `);
+  } catch (e) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nicio tranzactie deschisa */ }
+    throw e;
+  }
+}
+db.exec(`
+  CREATE TRIGGER IF NOT EXISTS audit_log_no_update BEFORE UPDATE ON audit_log
+  BEGIN SELECT RAISE(ABORT, 'audit_log este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS audit_log_no_delete BEFORE DELETE ON audit_log
+  BEGIN SELECT RAISE(ABORT, 'audit_log este append-only: stergerea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS result_versions_no_update BEFORE UPDATE ON result_versions
+  BEGIN SELECT RAISE(ABORT, 'result_versions este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS result_versions_no_delete BEFORE DELETE ON result_versions
+  BEGIN SELECT RAISE(ABORT, 'result_versions este append-only: stergerea este interzisa'); END;
+`);
+
+// Etapa B4 (L6): instantaneul buletinului la emitere. Continutul emis ramane
+// fixat (JSON + SHA-256), independent de tabelele "vii"; append-only.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS bulletin_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sample_id INTEGER NOT NULL UNIQUE,
+    bulletin_no TEXT NOT NULL UNIQUE,
+    snapshot_json TEXT NOT NULL,
+    snapshot_hash TEXT NOT NULL,
+    issued_by INTEGER,
+    issued_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (sample_id) REFERENCES samples(id),
+    FOREIGN KEY (issued_by) REFERENCES users(id)
+  );
+  CREATE TRIGGER IF NOT EXISTS bulletin_snapshots_no_update BEFORE UPDATE ON bulletin_snapshots
+  BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS bulletin_snapshots_no_delete BEFORE DELETE ON bulletin_snapshots
+  BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: stergerea este interzisa'); END;
+`);
+
 const validationSeed = [
   ['VAL-01', 'Autentificare și control pe roluri', 'Acces', 'Un beneficiar nu poate accesa funcțiile operatorului sau administratorului.'],
   ['VAL-02', 'Înregistrare probă', 'Recepție', 'O probă nouă primește identificator unic și poate fi urmărită ulterior.'],
   ['VAL-03', 'Calcul sumă aflatoxine', 'Calcul', 'Suma AFB1+AFB2+AFG1+AFG2 este calculată consistent cu valorile introduse.'],
   ['VAL-04', 'Evaluare față de limită', 'Reguli', 'Depășirea unei limite schimbă evaluarea probei în neconformă.'],
   ['VAL-05', 'Blocare validare incompletă', 'Validare', 'Rezultatul incomplet sau QC neacceptat nu poate fi validat.'],
-  ['VAL-06', 'Trasabilitatea modificării', 'Integritatea datelor', 'O modificare după validare retrage validarea și păstrează evenimentul în audit trail.'],
+  ['VAL-06', 'Trasabilitatea modificării', 'Integritatea datelor', 'Un rezultat validat nu mai poate fi modificat; fiecare modificare a unui rezultat nevalidat se păstrează ca versiune în istoric (cu motiv și sumă de control SHA-256) și ca eveniment în jurnalul de audit.'],
   ['VAL-07', 'Lucrare neconformă', 'Calitate', 'Un caz de lucrare neconformă poate fi înregistrat și închis cu o decizie.'],
-  ['VAL-08', 'Buletin și verificare', 'Raportare', 'Un buletin validat poate fi verificat prin identificatorul QR fără expunerea rezultatelor publice.']
+  ['VAL-08', 'Buletin și verificare', 'Raportare', 'Un buletin validat poate fi verificat prin identificatorul QR; pagina publică confirmă autenticitatea (număr, date, amprentă SHA-256) fără a expune rezultatele analitice.']
 ];
 const insertValidation = db.prepare(`INSERT OR IGNORE INTO system_validation_tests (code,title,area,expected) VALUES (?,?,?,?)`);
 const seedValidation = db.transaction(() => validationSeed.forEach(row => insertValidation.run(...row)));
 seedValidation();
+db.prepare(`UPDATE system_validation_tests SET expected = ? WHERE code = 'VAL-08' AND expected = ?`)
+  .run(validationSeed.find(r => r[0] === 'VAL-08')[3], 'Un buletin validat poate fi verificat prin identificatorul QR fără expunerea rezultatelor publice.');
+// Textul VAL-06 a fost corectat (descria un comportament inexistent). INSERT OR
+// IGNORE nu actualizeaza randuri existente, deci inlocuim doar textul vechi
+// exact, fara sa atingem rezultatul sau nota testului.
+db.prepare(`UPDATE system_validation_tests SET expected = ? WHERE code = 'VAL-06' AND expected = ?`)
+  .run(validationSeed.find(r => r[0] === 'VAL-06')[3], 'O modificare după validare retrage validarea și păstrează evenimentul în audit trail.');
 
 
 module.exports = db;

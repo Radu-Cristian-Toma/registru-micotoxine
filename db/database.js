@@ -210,6 +210,15 @@ if (resultsTableInfo && resultsTableInfo.sql.includes('limit_afb1 REAL DEFAULT 2
   `);
 }
 
+// Etapa B2 (L5): provenienta limitelor aplicate fiecarui rezultat. Profilul,
+// sursa si baza (profile / fallback / none / manual) raman scrise pe rezultat,
+// ca decizia de conformitate sa poata fi reconstituita ulterior chiar daca
+// profilurile din cod se schimba. Randurile vechi raman NULL (nedocumentat).
+const resultsColumnsB2 = db.prepare(`PRAGMA table_info(results)`).all().map(c => c.name);
+for (const col of ['limit_profile_id', 'limit_source', 'limit_regulation_ref', 'limit_basis', 'limit_override_reason']) {
+  if (!resultsColumnsB2.includes(col)) db.exec(`ALTER TABLE results ADD COLUMN ${col} TEXT`);
+}
+
 const sampleColumns = db.prepare(`PRAGMA table_info(samples)`).all().map(c => c.name);
 if (!sampleColumns.includes('haccp_intended_use')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_intended_use TEXT`);
 if (!sampleColumns.includes('haccp_hazard')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_hazard TEXT`);

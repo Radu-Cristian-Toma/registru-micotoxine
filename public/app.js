@@ -261,6 +261,16 @@ function renderReadOnlyExtraToxinRow(label, value, limit, hint, forceShow) {
   `;
 }
 
+// Provenienta limitelor afisate (L5): profil / implicite / manual / nedocumentat.
+function limitProvenanceText(sample) {
+  const basis = sample && sample.limitBasis;
+  if (basis === 'profile') return `${t('operator.limitBasisProfile')} ${escapeHtml(sample.limitSource || '')}`;
+  if (basis === 'fallback') return `⚠ ${t('operator.limitBasisFallback')}`;
+  if (basis === 'manual') return `${t('operator.limitBasisManual')} ${escapeHtml(sample.limitOverrideReason || '')}`;
+  if (basis === 'none') return t('operator.limitBasisNone');
+  return t('operator.limitBasisUnknown');
+}
+
 function ruleSourceLabel(source) {
   return source ? `${t('operator.ruleSourcePrefix')} ${escapeHtml(source)}` : t('operator.ruleStandardPoc');
 }
@@ -1463,6 +1473,8 @@ function renderBulletinReadOnly(sample) {
           })()}
         </tbody>
       </table>
+
+      <div class="section-hint" style="margin:8px 0;">${bt('bulletin.limitsBasis')}: ${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${escapeHtml(sample.limitSource || '')}${sample.limitRegulationRef ? ` — ${escapeHtml(sample.limitRegulationRef)}` : ''}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
 
       <div class="section-label">${bt('bulletin.operatorNotes')}</div>
       <div class="notes-area"><p class="readonly-notes">${sample.notes ? escapeHtml(sample.notes) : bt('bulletin.noNotes')}</p></div>
@@ -2861,6 +2873,11 @@ async function renderOperatorDetail() {
           <input type="number" step="0.1" id="f-limitAflaSum" value="${sample.limitAflaSum ?? ''}">
         </div>
         <div class="field">
+          <label for="f-limitReason">${t('operator.limitReasonLabel')}</label>
+          <input type="text" id="f-limitReason" maxlength="300" placeholder="${t('operator.limitReasonHint')}" value="">
+          <div class="section-hint">${limitProvenanceText(sample)}</div>
+        </div>
+        <div class="field">
           <label for="f-limitOta">${t('operator.limitOtaLabel')}</label>
           <input type="number" step="0.1" id="f-limitOta" value="${sample.limitOta ?? ''}">
         </div>
@@ -3207,6 +3224,7 @@ async function renderOperatorDetail() {
       limitDon: document.getElementById('f-limitDon')?.value ?? '',
       limitZea: document.getElementById('f-limitZea')?.value ?? '',
       limitFum: document.getElementById('f-limitFum')?.value ?? '',
+      limitChangeReason: document.getElementById('f-limitReason')?.value.trim() || '',
     };
     document.querySelectorAll('.result-input').forEach(input => {
       payload[input.dataset.key] = input.value;
@@ -3251,6 +3269,7 @@ async function renderOperatorDetail() {
       limitDon: document.getElementById('f-limitDon')?.value ?? '',
       limitZea: document.getElementById('f-limitZea')?.value ?? '',
       limitFum: document.getElementById('f-limitFum')?.value ?? '',
+      limitChangeReason: document.getElementById('f-limitReason')?.value.trim() || '',
     };
     document.querySelectorAll('.result-input').forEach(input => {
       payload[input.dataset.key] = input.value;

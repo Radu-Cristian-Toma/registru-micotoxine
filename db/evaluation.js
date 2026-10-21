@@ -448,4 +448,8 @@ function availableGroupsForProfile(profile) {
   return groups;
 }
 
-module.exports = { DEFAULT_LIMITS, RULE_PROFILES, getRuleProfile, evaluateResult, evaluateArchiveRow, TEST_GROUP_KEYS, availableGroupsForProfile };
+// Referinta de reglementare pentru profilurile de limite (Etapa B2, L5).
+const LIMIT_REGULATION_REF = 'Reg. (UE) 2023/915, versiunea consolidată 02023R0915-20250101 [de reconfirmat înainte de utilizare reală]';
+
+module.exports = {
+  LIMIT_REGULATION_REF, DEFAULT_LIMITS, RULE_PROFILES, getRuleProfile, evaluateResult, evaluateArchiveRow, TEST_GROUP_KEYS, availableGroupsForProfile };

@@ -261,6 +261,79 @@ function renderReadOnlyExtraToxinRow(label, value, limit, hint, forceShow) {
   `;
 }
 
+// Etapa B5 (interfata): regula de decizie si performanta metodei pe grup de
+// analiza (LOQ, recuperare, incertitudine extinsa relativa, k = 2). Valorile le
+// introduce laboratorul din validarea metodei; aplicatia nu propune valori.
+function parsePerformanceJson(sample) {
+  try { const p = sample && sample.methodPerformanceJson ? JSON.parse(sample.methodPerformanceJson) : null; return p && typeof p === 'object' ? p : {}; }
+  catch (_) { return {}; }
+}
+
+function performanceFormHtml(sample) {
+  const perf = parsePerformanceJson(sample);
+  const requested = sample.requestedTests || TEST_GROUP_DEFS.map(g => g.key);
+  const rule = sample.decisionRule === 'reg_2782_u' ? 'reg_2782_u' : 'simple';
+  const val = (g, f) => (perf[g] && perf[g][f] !== undefined && perf[g][f] !== null ? perf[g][f] : '');
+  const rows = TEST_GROUP_DEFS.filter(g => requested.includes(g.key)).map(g => `
+      <tr>
+        <td>${t(g.labelKey)}</td>
+        <td><input type="number" step="any" min="0" data-perf-group="${g.key}" data-perf-field="loq" value="${val(g.key, 'loq')}" aria-label="LOQ ${g.key}"></td>
+        <td><input type="number" step="any" min="0" max="200" data-perf-group="${g.key}" data-perf-field="recoveryPct" value="${val(g.key, 'recoveryPct')}" aria-label="${t('operator.perfRecovery')} ${g.key}"></td>
+        <td><input type="number" step="any" min="0" max="99.99" data-perf-group="${g.key}" data-perf-field="uRelPct" value="${val(g.key, 'uRelPct')}" aria-label="U ${g.key}"></td>
+      </tr>`).join('');
+  return `
+    <div class="field" style="grid-column:1 / -1;">
+      <label for="f-decisionRule">${t('operator.decisionRuleLabel')}</label>
+      <select id="f-decisionRule">
+        <option value="simple" ${rule === 'simple' ? 'selected' : ''}>${t('operator.decisionRuleSimple')}</option>
+        <option value="reg_2782_u" ${rule === 'reg_2782_u' ? 'selected' : ''}>${t('operator.decisionRuleReg2782')}</option>
+      </select>
+      <div class="section-hint">${t('operator.decisionRuleHint')}</div>
+      <table class="contaminants" style="margin-top:8px;">
+        <thead><tr><th>${t('operator.perfGroup')}</th><th>${t('operator.perfLoq')}</th><th>${t('operator.perfRecovery')}</th><th>${t('operator.perfUncertainty')}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="section-hint">${t('operator.perfHint')}</div>
+    </div>`;
+}
+
+// undefined = formularul nu are blocul (nu se trimite nimic); altfel obiect cu
+// doar valorile introduse.
+function collectPerformancePayload() {
+  const ruleEl = document.getElementById('f-decisionRule');
+  if (!ruleEl) return {};
+  const methodPerformance = {};
+  document.querySelectorAll('[data-perf-group]').forEach(inp => {
+    if (inp.value === '') return;
+    const g = inp.dataset.perfGroup;
+    (methodPerformance[g] = methodPerformance[g] || {})[inp.dataset.perfField] = inp.value;
+  });
+  return { decisionRule: ruleEl.value, methodPerformance };
+}
+
+// Rezumat pentru buletin: regula aplicata si, per analit, U/recuperare/LOQ si „<LOQ".
+function performanceBulletinHtml(sample) {
+  const perf = parsePerformanceJson(sample);
+  const rule = sample.decisionRule === 'reg_2782_u' ? 'reg_2782_u' : 'simple';
+  const groups = Object.keys(perf).filter(g => perf[g] && Object.keys(perf[g]).length);
+  if (rule === 'simple' && !groups.length) return '';
+  const valueOf = { aflatoxins: [sample.afb1, sample.afb2, sample.afg1, sample.afg2], ota: [sample.ota], m1: [sample.m1], don: [sample.don], zea: [sample.zea], fum: [sample.fum] };
+  const parts = groups.map(g => {
+    const p = perf[g];
+    const bits = [];
+    if (p.uRelPct !== undefined) bits.push(`U = ±${p.uRelPct}% (k = 2)`);
+    if (p.recoveryPct !== undefined) bits.push(`${bt('bulletin.recovery')} ${p.recoveryPct}%`);
+    if (p.loq !== undefined) {
+      bits.push(`LOQ ${p.loq}`);
+      const vals = (valueOf[g] || []).filter(v => v !== null && v !== undefined);
+      if (vals.some(v => v < p.loq)) bits.push("&lt;LOQ");
+    }
+    return `${escapeHtml(g)}: ${bits.join(', ')}`;
+  });
+  const ruleText = rule === 'reg_2782_u' ? bt('bulletin.ruleReg2782') : bt('bulletin.ruleSimple');
+  return `<div class="section-hint" style="margin:6px 0;">${bt('bulletin.decisionRule')}: ${ruleText}${parts.length ? `<br>${parts.join('<br>')}` : ''}</div>`;
+}
+
 // Provenienta limitelor afisate (L5): profil / implicite / manual / nedocumentat.
 function limitProvenanceText(sample) {
   const basis = sample && sample.limitBasis;
@@ -1476,6 +1549,7 @@ function renderBulletinReadOnly(sample) {
 
       <div class="section-hint" style="margin:8px 0;">${bt('bulletin.limitsBasis')}: ${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${escapeHtml(sample.limitSource || '')}${sample.limitRegulationRef ? ` — ${escapeHtml(sample.limitRegulationRef)}` : ''}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
 
+      ${performanceBulletinHtml(sample)}
       ${sample.bulletinHash ? `<div class="section-hint mono" style="margin:4px 0;word-break:break-all;">${bt('bulletin.fingerprint')}: ${escapeHtml(sample.bulletinHash)}</div>` : ''}
 
       <div class="section-label">${bt('bulletin.operatorNotes')}</div>
@@ -2879,6 +2953,7 @@ async function renderOperatorDetail() {
           <input type="text" id="f-limitReason" maxlength="300" placeholder="${t('operator.limitReasonHint')}" value="">
           <div class="section-hint">${limitProvenanceText(sample)}</div>
         </div>
+        ${performanceFormHtml(sample)}
         <div class="field">
           <label for="f-limitOta">${t('operator.limitOtaLabel')}</label>
           <input type="number" step="0.1" id="f-limitOta" value="${sample.limitOta ?? ''}">
@@ -3227,6 +3302,7 @@ async function renderOperatorDetail() {
       limitZea: document.getElementById('f-limitZea')?.value ?? '',
       limitFum: document.getElementById('f-limitFum')?.value ?? '',
       limitChangeReason: document.getElementById('f-limitReason')?.value.trim() || '',
+      ...collectPerformancePayload(),
     };
     document.querySelectorAll('.result-input').forEach(input => {
       payload[input.dataset.key] = input.value;
@@ -3272,6 +3348,7 @@ async function renderOperatorDetail() {
       limitZea: document.getElementById('f-limitZea')?.value ?? '',
       limitFum: document.getElementById('f-limitFum')?.value ?? '',
       limitChangeReason: document.getElementById('f-limitReason')?.value.trim() || '',
+      ...collectPerformancePayload(),
     };
     document.querySelectorAll('.result-input').forEach(input => {
       payload[input.dataset.key] = input.value;

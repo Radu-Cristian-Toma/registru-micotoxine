@@ -105,7 +105,7 @@ router.get('/stats/intake-time', requireRole('admin'), (req, res) => {
 
 router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) => {
   const rows = db.prepare(`
-    SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
+    SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate, s.sampled_by AS sampledBy,
            s.requested_tests AS requestedTestsJson, s.due_date AS dueDate, s.retest_of_sample_id AS retestOfSampleId, orig.code AS retestOfCode,
            s.is_control_sample AS isControlSample, s.operator_seen_state AS operatorSeenState,
            s.status, s.created_at AS createdAt, ow.company_name AS companyName,
@@ -114,10 +114,11 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.operator_id AS operatorId, r.review_status AS reviewStatus, r.reviewed_at AS reviewedAt, r.review_note AS reviewNote, ru.full_name AS reviewedByName,
-           r.validation_status AS validationStatus, r.validated_at AS validatedAt
+           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     LEFT JOIN users ru ON ru.id = r.reviewed_by
+    LEFT JOIN users vu ON vu.id = r.validated_by
     LEFT JOIN users ow ON ow.id = s.owner_id
     LEFT JOIN samples orig ON orig.id = s.retest_of_sample_id
     ORDER BY s.created_at DESC

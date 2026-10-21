@@ -1445,7 +1445,7 @@ function renderBulletinReadOnly(sample) {
         <div class="field"><label>${bt('bulletin.equipment')}</label><div class="field-static">${escapeHtml(sample.equipment || '—')}</div></div>
         <div class="field"><label>${bt('bulletin.validation')}</label><div class="field-static"><span class="validation-badge ${sample.validationStatus === 'validated' ? 'validated' : ''}">${sample.validationStatus === 'validated' ? bt('bulletin.validated') : bt('bulletin.draft')}</span>${sample.validatedByName ? ` · ${escapeHtml(sample.validatedByName)}` : ''}</div></div>
       </div>
-      <div id="rule-info" class="rule-info">${bt('bulletin.ruleInfo')}</div>
+      ${sample.validationStatus === 'validated' ? '' : `<div id="rule-info" class="rule-info">${bt('bulletin.ruleInfo')}</div>`}
 
       <div class="section-label"><span>${bt('bulletin.contaminants')} <span class="unit">(µg/kg)</span></span><span class="section-hint">${bt('bulletin.enterMethodValues')}</span></div>
       <table class="contaminants">
@@ -1547,10 +1547,10 @@ function renderBulletinReadOnly(sample) {
         </tbody>
       </table>
 
-      <div class="section-hint" style="margin:8px 0;">${bt('bulletin.limitsBasis')}: ${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${escapeHtml(sample.limitSource || '')}${sample.limitRegulationRef ? ` — ${escapeHtml(sample.limitRegulationRef)}` : ''}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
+      <div class="section-hint" style="margin:8px 0;"><div><strong>${bt('bulletin.limitsBasis')}</strong></div>${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${escapeHtml(sample.limitSource || '')}${sample.limitRegulationRef ? ` — ${escapeHtml(sample.limitRegulationRef)}` : ''}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
 
       ${performanceBulletinHtml(sample)}
-      ${sample.bulletinHash ? `<div class="section-hint mono" style="margin:4px 0;word-break:break-all;">${bt('bulletin.fingerprint')}: ${escapeHtml(sample.bulletinHash)}</div>` : ''}
+      ${sample.bulletinHash ? `<div class="section-hint" style="margin:4px 0;"><div><strong>${bt('bulletin.fingerprint')}</strong></div><div class="mono" style="word-break:break-all;">${escapeHtml(sample.bulletinHash)}</div></div>` : ''}
 
       <div class="section-label">${bt('bulletin.operatorNotes')}</div>
       <div class="notes-area"><p class="readonly-notes">${sample.notes ? escapeHtml(sample.notes) : bt('bulletin.noNotes')}</p></div>
@@ -2953,11 +2953,11 @@ async function renderOperatorDetail() {
           <input type="text" id="f-limitReason" maxlength="300" placeholder="${t('operator.limitReasonHint')}" value="">
           <div class="section-hint">${limitProvenanceText(sample)}</div>
         </div>
-        ${performanceFormHtml(sample)}
         <div class="field">
           <label for="f-limitOta">${t('operator.limitOtaLabel')}</label>
           <input type="number" step="0.1" id="f-limitOta" value="${sample.limitOta ?? ''}">
         </div>
+        ${performanceFormHtml(sample)}
       </div>
 
       <div class="section-label"><span>${t('operator.contaminantResultsTitle')} <span class="unit">(µg/kg)</span></span><span class="section-hint">${t('operator.contaminantResultsHint')}</span></div>
@@ -3221,6 +3221,10 @@ async function renderOperatorDetail() {
     const preselected = RULE_PROFILES_CACHE.find(p => p.id === operatorSelectedProfileId) || null;
     document.getElementById('f-rule-select').value = operatorSelectedProfileId;
     applyRuleProfile(preselected, { silent: true });
+  } else if (sample.limitProfileId && RULE_PROFILES_CACHE.some(p => p.id === sample.limitProfileId)) {
+    // Profilul salvat anterior se afișează ca selecție, fără a suprascrie
+    // limitele stocate pentru probă.
+    document.getElementById('f-rule-select').value = sample.limitProfileId;
   } else if (sample.category) {
     // Proba are deja categoria declarată la înregistrare: o preluăm ca implicit,
     // ca analistul să nu re-alegă ce a declarat clientul. Fără asta, formularul

@@ -219,6 +219,13 @@ for (const col of ['limit_profile_id', 'limit_source', 'limit_regulation_ref', '
   if (!resultsColumnsB2.includes(col)) db.exec(`ALTER TABLE results ADD COLUMN ${col} TEXT`);
 }
 
+// Etapa B5 (L2-L4): regula de decizie si performanta metodei pe rezultat.
+// decision_rule NULL = 'simple' (comportamentul anterior, neschimbat).
+const resultsColumnsB5 = db.prepare(`PRAGMA table_info(results)`).all().map(c => c.name);
+for (const col of ['decision_rule', 'method_performance_json']) {
+  if (!resultsColumnsB5.includes(col)) db.exec(`ALTER TABLE results ADD COLUMN ${col} TEXT`);
+}
+
 const sampleColumns = db.prepare(`PRAGMA table_info(samples)`).all().map(c => c.name);
 if (!sampleColumns.includes('haccp_intended_use')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_intended_use TEXT`);
 if (!sampleColumns.includes('haccp_hazard')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_hazard TEXT`);

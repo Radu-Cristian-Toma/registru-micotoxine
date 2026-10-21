@@ -197,7 +197,7 @@ router.get('/mine', requireRole('owner'), (req, res) => {
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
            s.sampled_by AS sampledBy, s.requested_tests AS requestedTestsJson, s.owner_seen_state AS ownerSeenState, s.due_date AS dueDate, s.retest_of_sample_id AS retestOfSampleId, orig.code AS retestOfCode, s.haccp_intended_use AS haccpIntendedUse, s.haccp_hazard AS haccpHazard, s.haccp_likelihood AS haccpLikelihood, s.haccp_severity AS haccpSeverity, s.haccp_risk_score AS haccpRiskScore, s.haccp_control_measure AS haccpControlMeasure, s.haccp_ccp_relevance AS haccpCcpRelevance, s.haccp_corrective_action AS haccpCorrectiveAction, s.status, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afg1, r.afg2, r.afb2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt, r.review_status AS reviewStatus,
            r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName
@@ -216,7 +216,8 @@ router.get('/mine', requireRole('owner'), (req, res) => {
     const { requestedTestsJson, ownerSeenState, ...rest } = r;
     const computedStatus = evaluateResult({
       afb1: r.afb1, afb2: r.afb2, afg1: r.afg1, afg2: r.afg2, ota: r.ota, m1: r.m1, don: r.don, zea: r.zea, fum: r.fum,
-      limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, limit_m1: r.limitM1, limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus
+      limit_afb1: r.limitAfb1, limit_afla_sum: r.limitAflaSum, limit_ota: r.limitOta, limit_m1: r.limitM1, limit_don: r.limitDon, limit_zea: r.limitZea, limit_fum: r.limitFum, qc_status: r.qcStatus,
+      decision_rule: r.decisionRule, method_performance_json: r.methodPerformanceJson
     });
     // Notificare in-app: proba e marcata "actualizata" daca starea curenta
     // (status calculat + status validare) difera de ultima stare vazuta de
@@ -238,7 +239,7 @@ router.get('/archive', requireRole('owner'), (req, res) => {
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
            s.sampled_by AS sampledBy, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
@@ -295,7 +296,7 @@ router.get('/archive/export', requireRole('owner'), (req, res) => {
     SELECT s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
            s.sampled_by AS sampledBy,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.qc_status AS qcStatus
@@ -391,7 +392,7 @@ router.get('/trend', requireRole('owner'), (req, res) => {
   const rows = db.prepare(`
     SELECT s.code, s.sample_date AS sampleDate, r.validated_at AS validatedAt,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1,
            r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum
     FROM samples s
@@ -430,7 +431,7 @@ router.get('/trend', requireRole('owner'), (req, res) => {
 router.get('/:id', requireRole('owner', 'admin'), (req, res) => {
   const sample = db.prepare(`
     SELECT s.*, r.afb1, r.afb2, r.afg1, r.afg2, r.ota,
-           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
+           r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
            r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName,
@@ -460,13 +461,13 @@ router.post('/:id/mark-seen', requireRole('owner'), (req, res) => {
 
   const current = db.prepare(`
     SELECT afb1, afb2, afg1, afg2, ota, m1, don, zea, fum,
-           limit_afb1 AS limitAfb1, limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
+           decision_rule AS decisionRule, method_performance_json AS methodPerformanceJson, limit_afb1 AS limitAfb1, limit_afla_sum AS limitAflaSum, limit_ota AS limitOta, limit_m1 AS limitM1,
            limit_don AS limitDon, limit_zea AS limitZea, limit_fum AS limitFum, validation_status AS validationStatus, qc_status AS qcStatus
     FROM results WHERE sample_id = ?
   `).get(req.params.id);
   const computedStatus = current ? evaluateResult({
     afb1: current.afb1, afb2: current.afb2, afg1: current.afg1, afg2: current.afg2, ota: current.ota, m1: current.m1, don: current.don, zea: current.zea, fum: current.fum,
-    limit_afb1: current.limitAfb1, limit_afla_sum: current.limitAflaSum, limit_ota: current.limitOta, limit_m1: current.limitM1, limit_don: current.limitDon, limit_zea: current.limitZea, limit_fum: current.limitFum, qc_status: current.qcStatus
+    limit_afb1: current.limitAfb1, limit_afla_sum: current.limitAflaSum, limit_ota: current.limitOta, limit_m1: current.limitM1, limit_don: current.limitDon, limit_zea: current.limitZea, limit_fum: current.limitFum, qc_status: current.qcStatus, decision_rule: current.decisionRule, method_performance_json: current.methodPerformanceJson
   }) : 'pending';
   const signature = `${computedStatus}|${current ? current.validationStatus : 'draft'}`;
 

@@ -1447,7 +1447,7 @@ function renderBulletinReadOnly(sample) {
       </div>
       ${sample.validationStatus === 'validated' ? '' : `<div id="rule-info" class="rule-info">${bt('bulletin.ruleInfo')}</div>`}
 
-      <div class="section-label"><span>${bt('bulletin.contaminants')} <span class="unit">(µg/kg)</span></span><span class="section-hint">${bt('bulletin.enterMethodValues')}</span></div>
+      <div class="section-label"><span>${bt('bulletin.contaminants')} <span class="unit">(µg/kg)</span></span>${sample.validationStatus === 'validated' ? '' : `<span class="section-hint">${bt('bulletin.enterMethodValues')}</span>`}</div>
       <table class="contaminants">
         <thead>
           <tr><th style="padding-left:28px;">${bt('bulletin.contaminant')}</th><th>${bt('bulletin.result')}</th><th>${bt('bulletin.maxLimit')}</th><th>${bt('bulletin.verdict')}</th></tr>

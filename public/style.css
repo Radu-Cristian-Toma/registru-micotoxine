@@ -306,6 +306,7 @@ table.contaminants td.readonly-val { font-weight: 500; }
 .limit-cell { color: var(--neutral); }
 .result-flag { font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; display: inline-block; transition: transform 0.2s var(--ease-spring); }
 .result-flag.ok { color: var(--ok); background: var(--ok-bg); }
+.result-flag.warn { color: #8A5A00; background: #FBF1DC; }
 .result-flag.fail { color: var(--danger); background: var(--danger-bg); }
 .result-flag.cancelled { color: #A5690E; background: #FBF6EB; }
 .result-flag.empty { color: var(--neutral); }
@@ -1598,3 +1599,21 @@ table.contaminants th .bulletin-en {
 /* Unitatea de măsură nu se scrie cu majuscule: sub text-transform: uppercase
    µ devine Μ (miu grecesc), iar „µg/kg” ajunge să arate „MG/KG”. */
 .unit, .unit * { text-transform: none; }
+
+/* Etapa C3/C4: laborator, trasabilitate, stare buletin */
+.lab-section { margin: 22px 0; }
+.lab-section h3 { margin: 0 0 8px; }
+.lab-status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.lab-status-card { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--line, #e3e0d6); border-radius: 10px; background: #fff; }
+.lab-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+.lab-pick .checkbox-row { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+.lab-clear { margin-top: 10px; }
+.lab-extras { margin: 18px 0; }
+.intake-condition { text-align: left; margin: 12px 0; }
+.intake-condition h4 { margin: 0 0 8px; }
+.bulletin-lab-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+.lifecycle-banner { margin: 10px 0 14px; padding: 12px 14px; border-radius: 10px; border: 2px solid #9B2C2C; background: #FBEAEA; color: #7A1F1F; }
+.lifecycle-banner.superseded { border-color: #8A5A00; background: #FBF1DC; color: #6B4500; }
+.table-scroll { overflow-x: auto; }
+@media (max-width: 720px) { .lab-pick { grid-template-columns: 1fr; } }
+@media print { .no-print, .bulletin-lab-actions { display: none !important; } .lifecycle-banner { border-width: 3px; } }

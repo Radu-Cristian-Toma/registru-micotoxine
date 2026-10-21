@@ -74,12 +74,12 @@ app.use((req, _res, next) => { req.session = { user: currentUser }; next(); });
 app.use('/api/samples', require('../../routes/samples'));
 app.use('/api/results', require('../../routes/results'));
 test.before(async () => {
-  for (const role of ['owner', 'operator', 'validator']) ids[role] = db.prepare(`INSERT INTO users (email, password_hash, full_name, role) VALUES (?, 'x', ?, ?)`).run(`${role}@test.invalid`, `Test ${role}`, role).lastInsertRowid;
+  for (const role of ['owner', 'operator', 'validator', 'validator2']) ids[role] = db.prepare(`INSERT INTO users (email, password_hash, full_name, role) VALUES (?, 'x', ?, ?)`).run(`${role}@test.invalid`, `Test ${role}`, role === 'validator2' ? 'validator' : role).lastInsertRowid;
   await new Promise(r => { server = app.listen(0, '127.0.0.1', r); });
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
 test.after(() => { server.close(); try { db.close(); } catch (_) {} fs.rmSync(tmp, { recursive: true, force: true }); });
-const as = (role) => { currentUser = { id: ids[role], role }; };
+const as = (role) => { currentUser = { id: ids[role], role: role === 'validator2' ? 'validator' : role }; };
 async function call(method, url, body) {
   const res = await fetch(baseUrl + url, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, body: await res.json().catch(() => null) };
@@ -117,7 +117,7 @@ test('rută: schimbarea regulii de decizie cere motiv; cu motiv schimbă verdict
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(db.prepare('SELECT status FROM samples WHERE id = ?').get(id).status, 'ok');
   const ev = JSON.parse(db.prepare(`SELECT details FROM audit_log WHERE sample_id = ? AND action = 'results_saved' ORDER BY id DESC`).get(id).details);
-  assert.deepEqual(ev.decisionRuleChanged, { from: 'simple', to: 'reg_2782_u', reason: 'Politica laboratorului [exemplu de test]' });
+  assert.deepEqual(ev.decisionRuleChanged, { from: 'simple', to: 'reg_2782_u', correctionChanged: false, reason: 'Politica laboratorului [exemplu de test]' });
   const bad = await call('PUT', `/api/results/${id}`, { ota: 3.2, decisionRule: 'inventata', limitChangeReason: 'x' });
   assert.equal(bad.status, 400);
 });
@@ -129,6 +129,7 @@ test('rută: instantaneul buletinului păstrează regula și detaliul de decizie
   assert.equal(put.status, 200, JSON.stringify(put.body));
   as('validator');
   assert.equal((await call('POST', `/api/results/${id}/review`, { decision: 'approved' })).status, 200);
+  as('validator2');
   const v = await call('POST', `/api/results/${id}/validate`, {});
   assert.equal(v.status, 200, JSON.stringify(v.body));
   const snap = JSON.parse(db.prepare('SELECT snapshot_json FROM bulletin_snapshots WHERE sample_id = ?').get(id).snapshot_json);

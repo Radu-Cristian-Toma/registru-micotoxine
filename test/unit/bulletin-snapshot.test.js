@@ -23,15 +23,15 @@ app.use('/api/results', require('../../routes/results'));
 
 let server; let base; const ids = {};
 test.before(async () => {
-  for (const role of ['owner', 'operator', 'validator']) {
-    ids[role] = db.prepare(`INSERT INTO users (email, password_hash, full_name, role) VALUES (?, 'x', ?, ?)`).run(`${role}@test.invalid`, `Test ${role}`, role).lastInsertRowid;
+  for (const role of ['owner', 'operator', 'validator', 'validator2']) {
+    ids[role] = db.prepare(`INSERT INTO users (email, password_hash, full_name, role) VALUES (?, 'x', ?, ?)`).run(`${role}@test.invalid`, `Test ${role}`, role === 'validator2' ? 'validator' : role).lastInsertRowid;
   }
   await new Promise(r => { server = app.listen(0, '127.0.0.1', r); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
 test.after(() => { server.close(); try { db.close(); } catch (_) {} fs.rmSync(tmp, { recursive: true, force: true }); });
 
-const as = (role) => { currentUser = { id: ids[role], role, fullName: `Test ${role}` }; };
+const as = (role) => { currentUser = { id: ids[role], role: role === 'validator2' ? 'validator' : role, fullName: `Test ${role}` }; };
 async function call(method, url, body) {
   const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, body: await res.json().catch(() => null) };
@@ -49,6 +49,7 @@ async function issueBulletin(product = 'făină de grâu') {
   as('validator');
   const rv = await call('POST', `/api/results/${id}/review`, { decision: 'approved', note: 'ok' });
   assert.equal(rv.status, 200, JSON.stringify(rv.body));
+  as('validator2');
   const v = await call('POST', `/api/results/${id}/validate`, {});
   assert.equal(v.status, 200, JSON.stringify(v.body));
   return { id, bulletinNo: v.body.bulletinNo };
@@ -64,7 +65,7 @@ test('la validare se stochează un instantaneu cu SHA-256 corect și conținut c
   assert.equal(snap.results.ota, 1.2);
   assert.equal(snap.limits.ota, 3);
   assert.equal(snap.limitProvenance.profileId, 'cereal-milling-products');
-  assert.equal(snap.validation.validatedByName, 'Test validator');
+  assert.equal(snap.validation.validatedByName, 'Test validator2');
   assert.equal(snap.sample.productName, 'făină de grâu');
   assert.ok(db.prepare(`SELECT 1 FROM audit_log WHERE sample_id = ? AND action = 'bulletin_snapshot_stored'`).get(id));
 });

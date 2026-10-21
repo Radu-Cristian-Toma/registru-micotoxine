@@ -17,6 +17,7 @@ const resultsRoutes = require('./routes/results');
 const dashboardRoutes = require('./routes/dashboard');
 const validationRoutes = require('./routes/validation');
 const incidentRoutes = require('./routes/incidents');
+const labRoutes = require('./routes/lab');
 const SqliteSessionStore = require('./db/session-store');
 const { ensureCsrfToken, requireCsrf } = require('./middleware/csrf');
 
@@ -69,6 +70,7 @@ app.use('/api/results', resultsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/validation', validationRoutes);
 app.use('/api/incidents', incidentRoutes);
+app.use('/api/lab', labRoutes);
 
 // Pagina publica de verificare a unui buletin (scanata din codul QR tiparit
 // pe buletin). Nu necesita autentificare - oricine cu numarul de buletin

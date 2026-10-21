@@ -367,9 +367,8 @@ function getRuleProfile(category = '', productName = '') {
 // utilizare reala]. Incertitudinea extinsa este relativa (%), k = 2, pe grup de
 // analiza; pentru suma aflatoxinelor se foloseste valoarea grupului
 // 'aflatoxins' [de verificat metrologic de laborator].
-const DECISION_RULES = ['simple', 'reg_2782_u'];
-const PERFORMANCE_GROUPS = ['aflatoxins', 'ota', 'm1', 'don', 'zea', 'fum'];
-const ANALYTE_GROUP = { afb1: 'aflatoxins', afb2: 'aflatoxins', afg1: 'aflatoxins', afg2: 'aflatoxins', aflaSum: 'aflatoxins', ota: 'ota', m1: 'm1', don: 'don', zea: 'zea', fum: 'fum' };
+const Core = require('../public/decision-core');
+const { DECISION_RULES, PERFORMANCE_GROUPS, ANALYTE_GROUP } = Core;
 
 function parsePerformance(result) {
   let p = result.method_performance;
@@ -383,48 +382,36 @@ function decisionRuleOf(result) {
   return DECISION_RULES.includes(r) ? r : 'simple';
 }
 
-// Verdict pe analit: 'conform' | 'non_conform' | 'within_uncertainty' (valoare
-// peste limita, dar limita este in intervalul valoare ± U - acceptat de regula
-// reg_2782_u, semnalat explicit) | null (fara valoare sau fara limita).
-function judge(value, limit, rule, uRelPct) {
-  if (value === null || value === undefined || limit === null || limit === undefined) return null;
-  if (!(value > limit)) return 'conform';
-  if (rule === 'reg_2782_u' && Number.isFinite(uRelPct) && uRelPct > 0) {
-    const uAbs = value * uRelPct / 100;
-    return (value - uAbs > limit) ? 'non_conform' : 'within_uncertainty';
+// Valoarea masurata pentru un analit; pentru suma aflatoxinelor se foloseste
+// suma „lower bound” (valorile sub LOQ = 0), conform Reg. (UE) 2023/915, anexa I, sectiunea 1.1.
+function measuredFor(result, key) {
+  if (key === 'aflaSum') {
+    const r = Core.aflatoxinSum(result, parsePerformance(result));
+    return r ? r.sum : null;
   }
-  return 'non_conform';
+  return result[key] === undefined ? null : result[key];
 }
 
 function exceeds(result, key, limit, value) {
-  const rule = decisionRuleOf(result);
-  const perf = parsePerformance(result);
-  const g = perf[ANALYTE_GROUP[key]] || {};
-  return judge(value, limit, rule, Number(g.uRelPct)) === 'non_conform';
+  const a = Core.assess(key, value, limit, decisionRuleOf(result), parsePerformance(result));
+  return a.verdict === 'non_conform';
 }
 
-// Detaliu de decizie per analit (pentru buletin/audit): valoare, limita,
+// Detaliu de decizie per analit (pentru buletin/audit): valoare masurata,
+// valoare efectiva (corectata pentru recuperare doar la cerere), limita,
 // performanta metodei, "<LOQ" si verdict, dupa regula de decizie a probei.
 function decisionDetail(result) {
   const rule = decisionRuleOf(result);
   const perf = parsePerformance(result);
   const limitOf = { afb1: result.limit_afb1, aflaSum: result.limit_afla_sum, ota: result.limit_ota, m1: result.limit_m1, don: result.limit_don, zea: result.limit_zea, fum: result.limit_fum };
-  const afVals = [result.afb1, result.afb2, result.afg1, result.afg2];
-  const sum = afVals.every(v => v !== null && v !== undefined) ? afVals.reduce((a, b) => a + b, 0) : null;
-  const values = { afb1: result.afb1, aflaSum: sum, ota: result.ota, m1: result.m1, don: result.don, zea: result.zea, fum: result.fum };
   const rows = {};
-  for (const key of Object.keys(values)) {
-    const g = perf[ANALYTE_GROUP[key]] || {};
-    const uRelPct = Number.isFinite(Number(g.uRelPct)) && g.uRelPct !== null && g.uRelPct !== '' ? Number(g.uRelPct) : null;
-    const loq = Number.isFinite(Number(g.loq)) && g.loq !== null && g.loq !== '' ? Number(g.loq) : null;
-    const value = values[key];
-    rows[key] = {
-      value: value ?? null, limit: limitOf[key] ?? null, uRelPct, uK: uRelPct === null ? null : 2,
-      recoveryPct: Number.isFinite(Number(g.recoveryPct)) && g.recoveryPct !== null && g.recoveryPct !== '' ? Number(g.recoveryPct) : null,
-      loq, belowLoq: loq !== null && value !== null && value !== undefined && value < loq,
-      verdict: judge(value, limitOf[key], rule, uRelPct)
-    };
+  for (const key of Object.keys(limitOf)) {
+    const row = Core.assess(key, measuredFor(result, key), limitOf[key], rule, perf);
+    rows[key] = { ...row, limit: limitOf[key] ?? null, value: row.value ?? null };
   }
+  const sumInfo = Core.aflatoxinSum(result, perf);
+  rows.aflaSum.lowerBound = !!(sumInfo && sumInfo.lowerBound);
+  rows.aflaSum.belowLoqCount = sumInfo ? sumInfo.belowLoq : 0;
   return { rule, rows };
 }
 
@@ -469,12 +456,8 @@ function evaluateResult(result) {
   if (result.limit_fum !== null && result.limit_fum !== undefined && result.fum !== null && result.fum !== undefined && exceeds(result, 'fum', result.limit_fum, result.fum)) anyOver = true;
 
   if (aflaSumRelevant) {
-    const afVals = [result.afb1, result.afb2, result.afg1, result.afg2];
-    const afAllEntered = afVals.every(v => v !== null && v !== undefined);
-    if (afAllEntered) {
-      const sum = afVals.reduce((a, b) => a + b, 0);
-      if (exceeds(result, 'aflaSum', result.limit_afla_sum, sum)) anyOver = true;
-    }
+    const sum = measuredFor(result, 'aflaSum');
+    if (sum !== null && exceeds(result, 'aflaSum', result.limit_afla_sum, sum)) anyOver = true;
   }
 
   if (anyOver) return 'fail';

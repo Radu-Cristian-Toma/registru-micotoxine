@@ -1,4 +1,6 @@
 const express = require('express');
+const { nowLocal } = require('../db/clock');
+const { attachBulletinLifecycle } = require('../db/bulletin-state');
 const db = require('../db/database');
 const { logEvent } = require('../db/audit');
 const { requireRole } = require('../middleware/auth');
@@ -43,6 +45,18 @@ function genCode() {
 router.post('/', requireRole('owner'), (req, res) => {
   const { productName, category, sampleDate, sampledBy, requestedDueDate, samplingAttested } = req.body;
   const h = normalizeHaccp(req.body);
+
+  // Etapa C4 (L15): date de prelevare declarate de beneficiar (optionale; laboratorul nu raspunde de prelevare).
+  const numOrNull = (v) => (v === undefined || v === null || v === '' ? null : Number(v));
+  const lotSizeKg = numOrNull(req.body.lotSizeKg);
+  const incrementsCount = numOrNull(req.body.incrementsCount);
+  const samplingMethod = String(req.body.samplingMethod || '').trim().slice(0, 300) || null;
+  if (lotSizeKg !== null && (!Number.isFinite(lotSizeKg) || lotSizeKg <= 0)) {
+    return res.status(400).json({ error: 'Dimensiunea lotului trebuie să fie un număr pozitiv (kg).' });
+  }
+  if (incrementsCount !== null && (!Number.isInteger(incrementsCount) || incrementsCount < 1 || incrementsCount > 1000)) {
+    return res.status(400).json({ error: 'Numărul de probe elementare trebuie să fie un întreg între 1 și 1000.' });
+  }
 
   if (!productName) {
     return res.status(400).json({ error: 'Denumirea probei este obligatorie.' });
@@ -110,6 +124,10 @@ router.post('/', requireRole('owner'), (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(code, req.session.user.id, productName.trim(), category || null, sampleDate || null, sampledBy || null, JSON.stringify(requestedTests), 'pending|draft', 'pending|pending|draft', dueDate, h.intendedUse, h.hazard, h.likelihood, h.severity, h.riskScore, h.controlMeasure, h.ccpRelevance, h.correctiveAction);
 
+  if (lotSizeKg !== null || incrementsCount !== null || samplingMethod) {
+    db.prepare('UPDATE samples SET lot_size_kg = ?, increments_count = ?, sampling_method = ? WHERE id = ?').run(lotSizeKg, incrementsCount, samplingMethod, info.lastInsertRowid);
+  }
+
   // Limitele initiale reflecta DE LA INCEPUT categoria si analizele comandate
   // - nu mai pornim implicit cu limite de cereale pentru orice produs. Un
   // grup necomandat sau fara profil potrivit ramane cu limita null.
@@ -145,7 +163,7 @@ router.post('/', requireRole('owner'), (req, res) => {
   // prelevarii corecte - un simplu gate la trimitere s-ar pierde imediat
   // dupa raspuns, fara nicio urma verificabila ulterior.
   db.prepare(`INSERT INTO audit_log (sample_id, user_id, action, details) VALUES (?, ?, ?, ?)`)
-    .run(info.lastInsertRowid, req.session.user.id, 'sampling_attested', JSON.stringify({ attestedAt: new Date().toISOString() }));
+    .run(info.lastInsertRowid, req.session.user.id, 'sampling_attested', JSON.stringify({ attestedAt: nowLocal() }));
 
   res.json({ id: info.lastInsertRowid, code, requestedTests });
 });
@@ -195,12 +213,12 @@ router.post('/control', requireRole('operator', 'admin'), (req, res) => {
 router.get('/mine', requireRole('owner'), (req, res) => {
   const rows = db.prepare(`
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
-           s.sampled_by AS sampledBy, s.requested_tests AS requestedTestsJson, s.owner_seen_state AS ownerSeenState, s.due_date AS dueDate, s.retest_of_sample_id AS retestOfSampleId, orig.code AS retestOfCode, s.haccp_intended_use AS haccpIntendedUse, s.haccp_hazard AS haccpHazard, s.haccp_likelihood AS haccpLikelihood, s.haccp_severity AS haccpSeverity, s.haccp_risk_score AS haccpRiskScore, s.haccp_control_measure AS haccpControlMeasure, s.haccp_ccp_relevance AS haccpCcpRelevance, s.haccp_corrective_action AS haccpCorrectiveAction, s.status, s.created_at AS createdAt, ow.company_name AS companyName,
+           s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod, s.requested_tests AS requestedTestsJson, s.owner_seen_state AS ownerSeenState, s.due_date AS dueDate, s.retest_of_sample_id AS retestOfSampleId, orig.code AS retestOfCode, s.haccp_intended_use AS haccpIntendedUse, s.haccp_hazard AS haccpHazard, s.haccp_likelihood AS haccpLikelihood, s.haccp_severity AS haccpSeverity, s.haccp_risk_score AS haccpRiskScore, s.haccp_control_measure AS haccpControlMeasure, s.haccp_ccp_relevance AS haccpCcpRelevance, s.haccp_corrective_action AS haccpCorrectiveAction, s.status, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afg1, r.afg2, r.afb2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta, r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt, r.review_status AS reviewStatus,
-           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName
+           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName, r.intake_condition_json AS intakeConditionJson, r.reporting_basis AS reportingBasis, r.dry_matter_pct AS dryMatterPct, r.lab_sample_mass_g AS labSampleMassG, r.homogenization, r.replicates, r.equipment_ids_json AS equipmentIdsJson, r.reagent_lot_ids_json AS reagentLotIdsJson
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     LEFT JOIN users vu ON vu.id = r.validated_by
@@ -227,7 +245,7 @@ router.get('/mine', requireRole('owner'), (req, res) => {
     return { ...rest, requestedTests, status: computedStatus, hasUpdate };
   });
 
-  res.json({ samples: withStatus });
+  res.json({ samples: attachBulletinLifecycle(withStatus) });
 });
 
 // Arhiva proprietarului: aceleasi probe ca /mine, dar cu filtre de cautare.
@@ -237,13 +255,13 @@ router.get('/archive', requireRole('owner'), (req, res) => {
 
   let query = `
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
-           s.sampled_by AS sampledBy, s.created_at AS createdAt, ow.company_name AS companyName,
+           s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
-           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName
+           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName, r.intake_condition_json AS intakeConditionJson, r.reporting_basis AS reportingBasis, r.dry_matter_pct AS dryMatterPct, r.lab_sample_mass_g AS labSampleMassG, r.homogenization, r.replicates, r.equipment_ids_json AS equipmentIdsJson, r.reagent_lot_ids_json AS reagentLotIdsJson
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     LEFT JOIN users ow ON ow.id = s.owner_id
@@ -285,7 +303,7 @@ router.get('/archive', requireRole('owner'), (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const paged = withStatus.slice((page - 1) * pageSize, page * pageSize);
 
-  res.json({ samples: paged, total, page, pageSize });
+  res.json({ samples: attachBulletinLifecycle(paged), total, page, pageSize });
 });
 
 // Export CSV al arhivei, cu aceleasi filtre ca mai sus.
@@ -294,7 +312,7 @@ router.get('/archive/export', requireRole('owner'), (req, res) => {
 
   let query = `
     SELECT s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate,
-           s.sampled_by AS sampledBy,
+           s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
@@ -434,7 +452,7 @@ router.get('/:id', requireRole('owner', 'admin'), (req, res) => {
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.analysis_date AS analysisDate, r.notes, r.method, r.equipment, r.qc_status AS qcStatus, r.qc_rejection_reason AS qcRejectionReason, r.intake_checked_at AS intakeCheckedAt,
-           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName,
+           r.validation_status AS validationStatus, r.validated_at AS validatedAt, r.bulletin_no AS bulletinNo, r.bulletin_issued_at AS bulletinIssuedAt, vu.full_name AS validatedByName, r.intake_condition_json AS intakeConditionJson, r.reporting_basis AS reportingBasis, r.dry_matter_pct AS dryMatterPct, r.lab_sample_mass_g AS labSampleMassG, r.homogenization, r.replicates, r.equipment_ids_json AS equipmentIdsJson, r.reagent_lot_ids_json AS reagentLotIdsJson,
            ow.company_name AS companyName, ow.company_reg_no AS companyRegNo, ow.company_address AS companyAddress, ow.company_contact AS companyContact
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id

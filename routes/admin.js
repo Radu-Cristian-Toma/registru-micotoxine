@@ -165,4 +165,42 @@ router.put('/lab-settings', requireRole('admin'), (req, res) => {
   res.json({ ok: true });
 });
 
+// Politici de laborator (etapa C3/C4): separarea sarcinilor (L17), retentia dosarelor (L12),
+// intervalul maxim de la ultimul control QC (L13). Citirea e permisa oricarui utilizator
+// autentificat (interfata adapteaza ecranele); modificarea doar adminului, cu motiv scris
+// cand separarea sarcinilor se relaxeaza, si cu jurnalizare.
+router.get('/policy', requireLogin, (req, res) => {
+  const r = db.prepare('SELECT strict_roles, retention_years, qc_max_age_days FROM lab_settings WHERE id = 1').get() || {};
+  res.json({ policy: { strictRoles: r.strict_roles !== 0, retentionYears: r.retention_years ?? null, qcMaxAgeDays: r.qc_max_age_days ?? 7 } });
+});
+
+router.put('/policy', requireRole('admin'), (req, res) => {
+  const prev = db.prepare('SELECT strict_roles, retention_years, qc_max_age_days FROM lab_settings WHERE id = 1').get() || {};
+  const next = { strict_roles: prev.strict_roles ?? 1, retention_years: prev.retention_years ?? null, qc_max_age_days: prev.qc_max_age_days ?? 7 };
+  const { strictRoles, retentionYears, qcMaxAgeDays, reason } = req.body;
+  if (strictRoles !== undefined) next.strict_roles = (strictRoles === true || strictRoles === 'true' || strictRoles === 1) ? 1 : 0;
+  if (retentionYears !== undefined) {
+    if (retentionYears === null || retentionYears === '') next.retention_years = null;
+    else {
+      const n = Number(retentionYears);
+      if (!Number.isInteger(n) || n < 1 || n > 100) return res.status(400).json({ error: 'Perioada de retenție trebuie să fie un număr întreg de ani între 1 și 100.' });
+      next.retention_years = n;
+    }
+  }
+  if (qcMaxAgeDays !== undefined) {
+    const n = Number(qcMaxAgeDays);
+    if (!Number.isInteger(n) || n < 0 || n > 365) return res.status(400).json({ error: 'Intervalul maxim de la ultimul control QC trebuie să fie între 0 și 365 de zile (0 = fără avertisment).' });
+    next.qc_max_age_days = n;
+  }
+  const reasonText = String(reason || '').trim();
+  const relaxing = prev.strict_roles !== 0 && next.strict_roles === 0;
+  if (relaxing && !reasonText) return res.status(400).json({ error: 'Relaxarea separării sarcinilor necesită un motiv scris, care rămâne în jurnalul de audit.' });
+  const changed = {};
+  for (const k of Object.keys(next)) if ((prev[k] ?? null) !== next[k]) changed[k] = { from: prev[k] ?? null, to: next[k] };
+  db.prepare(`UPDATE lab_settings SET strict_roles = ?, retention_years = ?, qc_max_age_days = ?, updated_by = ?, updated_at = datetime('now', 'localtime') WHERE id = 1`)
+    .run(next.strict_roles, next.retention_years, next.qc_max_age_days, req.session.user.id);
+  if (Object.keys(changed).length) logEvent(req.session.user.id, 'policy_updated', { changed, reason: reasonText || null });
+  res.json({ ok: true, policy: { strictRoles: next.strict_roles !== 0, retentionYears: next.retention_years, qcMaxAgeDays: next.qc_max_age_days } });
+});
+
 module.exports = router;

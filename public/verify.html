@@ -130,7 +130,7 @@ async function loadVerification() {
           <div class="field-grid">
             <div class="field"><label>${bt('verify.bulletinNumberShort')}</label><div class="field-static">${escapeHtml(b.bulletinNo)}</div></div>
             <div class="field"><label>${bt('verify.validationDate')}</label><div class="field-static">${escapeHtml(b.validatedAt || '—')}</div></div>
-            <div class="field"><label>${bt('verify.fingerprintLabel')}</label><div class="field-static mono" style="word-break:break-all;">${b.snapshotHash ? escapeHtml(b.snapshotHash) : bt('verify.noFingerprint')}</div></div>
+            <div class="field"><label>${bt('verify.fingerprintLabel')}</label><div class="field-static mono" style="word-break:break-all;height:auto;min-height:0;line-height:1.5;white-space:normal;">${b.snapshotHash ? escapeHtml(b.snapshotHash) : bt('verify.noFingerprint')}</div></div>
           </div>
           <div class="section-hint" style="margin-top:14px;">${bt('verify.minimalNote')}</div>
         </div>

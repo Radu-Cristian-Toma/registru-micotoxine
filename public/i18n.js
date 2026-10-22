@@ -473,6 +473,9 @@ const TRANSLATIONS = {
     nextActionCheckQc: { ro: 'Verifică QC', en: 'Check QC' },
     nextActionViewReason: { ro: 'Vezi motivul anulării', en: 'View cancellation reason' },
     nextActionReadyValidation: { ro: 'Pregătit pentru validare', en: 'Ready for validation' },
+    nextActionReturned: { ro: 'Returnat operatorului', en: 'Returned to operator' },
+    nextActionDetailReturned: { ro: 'Validatorul a respins rezultatele la revizuire. Operatorul le corectează și le retrimite spre validare.', en: 'The validator rejected the results at review. The operator corrects and resubmits them for validation.' },
+    queueReturned: { ro: 'Returnat', en: 'Returned' },
     // renderOperatorList
     noSampleForFilter: { ro: 'Nicio probă pentru filtrul ales.', en: 'No sample for the selected filter.' },
     noSampleInQueue: { ro: 'Nicio probă în coadă.', en: 'No sample in queue.' },

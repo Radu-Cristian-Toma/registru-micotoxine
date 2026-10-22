@@ -21,6 +21,8 @@ const required = [
   'db/session-store.js',
   'config.js',
   'scripts/backup-db.js',
+  'scripts/export-digest.js',
+  'scripts/verify-integrity.js',
   'scripts/verify-integrity.js',
   'db/audit.js',
   'db/clock.js',

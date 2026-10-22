@@ -6,6 +6,11 @@ const path = require('path');
 const DB_PATH = process.env.LIMS_DB_PATH || path.join(__dirname, 'lims.db');
 const db = new Database(DB_PATH);
 
+// Functie SHA-256 pusa la dispozitia declansatoarelor care inlantuie amprentele
+// (audit_log, result_versions). Trebuie inregistrata pe fiecare conexiune care
+// scrie in aceste tabele; o conexiune externa fara ea nu poate insera in ele.
+db.function('lims_sha256', { deterministic: true }, (text) => require('crypto').createHash('sha256').update(String(text)).digest('hex'));
+
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
@@ -559,6 +564,47 @@ db.exec(`
   BEGIN SELECT RAISE(ABORT, 'result_versions este append-only: modificarea este interzisa'); END;
   CREATE TRIGGER IF NOT EXISTS result_versions_no_delete BEFORE DELETE ON result_versions
   BEGIN SELECT RAISE(ABORT, 'result_versions este append-only: stergerea este interzisa'); END;
+`);
+
+// Etapa D (model de amenintare, nivel N2): inlantuirea amprentelor. Fiecare rand nou din
+// audit_log si result_versions primeste, in tabele separate append-only, o amprenta SHA-256
+// care include amprenta randului anterior. Modificarea sau stergerea unui rand intermediar
+// rupe lantul si este detectata de scripts/verify-integrity.js. Randurile anterioare
+// introducerii lantului nu au amprenta (avertisment la verificare). Lantul singur nu rezista
+// unui atacator care il recalculeaza integral: pentru aceasta se foloseste rezumatul periodic
+// exportat in afara bazei (scripts/export-digest.js).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS audit_chain (
+    id INTEGER PRIMARY KEY,
+    prev_hash TEXT NOT NULL,
+    row_hash TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS result_versions_chain (
+    id INTEGER PRIMARY KEY,
+    prev_hash TEXT NOT NULL,
+    row_hash TEXT NOT NULL
+  );
+  CREATE TRIGGER IF NOT EXISTS audit_chain_no_update BEFORE UPDATE ON audit_chain
+  BEGIN SELECT RAISE(ABORT, 'audit_chain este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS audit_chain_no_delete BEFORE DELETE ON audit_chain
+  BEGIN SELECT RAISE(ABORT, 'audit_chain este append-only: stergerea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS result_versions_chain_no_update BEFORE UPDATE ON result_versions_chain
+  BEGIN SELECT RAISE(ABORT, 'result_versions_chain este append-only: modificarea este interzisa'); END;
+  CREATE TRIGGER IF NOT EXISTS result_versions_chain_no_delete BEFORE DELETE ON result_versions_chain
+  BEGIN SELECT RAISE(ABORT, 'result_versions_chain este append-only: stergerea este interzisa'); END;
+
+  CREATE TRIGGER IF NOT EXISTS audit_log_chain AFTER INSERT ON audit_log
+  BEGIN
+    INSERT INTO audit_chain (id, prev_hash, row_hash)
+    SELECT NEW.id, p.h, lims_sha256(p.h || '|' || json_array(NEW.id, NEW.sample_id, NEW.user_id, NEW.action, NEW.details, NEW.created_at))
+    FROM (SELECT COALESCE((SELECT row_hash FROM audit_chain ORDER BY id DESC LIMIT 1), 'GENESIS') AS h) p;
+  END;
+  CREATE TRIGGER IF NOT EXISTS result_versions_chain_ins AFTER INSERT ON result_versions
+  BEGIN
+    INSERT INTO result_versions_chain (id, prev_hash, row_hash)
+    SELECT NEW.id, p.h, lims_sha256(p.h || '|' || json_array(NEW.id, NEW.sample_id, NEW.version_no, NEW.snapshot_hash, NEW.change_reason, NEW.changed_by, NEW.created_at))
+    FROM (SELECT COALESCE((SELECT row_hash FROM result_versions_chain ORDER BY id DESC LIMIT 1), 'GENESIS') AS h) p;
+  END;
 `);
 
 // Etapa B4 (L6): instantaneul buletinului la emitere. Continutul emis ramane

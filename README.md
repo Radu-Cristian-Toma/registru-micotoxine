@@ -106,6 +106,12 @@ Restaurare:
 
 Frecvența copiilor, locul de păstrare, retenția și testele periodice de restaurare rămân de stabilit de laborator [de completat].
 
+## Lanț de amprente și rezumat periodic
+
+Fiecare rând nou din `audit_log` și din `result_versions` primește, prin declanșator, un element în tabelele append-only `audit_chain` și `result_versions_chain`: `row_hash = SHA-256(prev_hash | conținut canonic)`, începând de la `GENESIS`. Modificarea, ștergerea sau inserarea unui rând ulterior rupe lanțul și este raportată de `node scripts/verify-integrity.js`.
+
+Lanțul singur nu împiedică un atacator cu acces la fișierul bazei de date să recalculeze întregul lanț. De aceea se exportă periodic, în afara bazei, un rezumat (`npm run digest`, director implicit `digest/`, exclus din git), care conține capetele lanțurilor, numărul de rânduri și amprenta instantaneelor de buletin. Verificare: `node scripts/verify-integrity.js --digest <fișier>`. Rezumatul trebuie semnat sau arhivat pe un suport separat (procedură [de completat]); fără acest pas, protecția acoperă doar modificările care nu recalculează lanțul. Rândurile anterioare introducerii lanțului sunt raportate ca avertisment, nu ca discrepanță. Limite: un atacator care controlează și aplicația, și suportul rezumatelor nu este acoperit (vezi `docs/articol/MODEL_AMENINTARE.md`, nivelul N3).
+
 ## Teste automate
 
 `npm test` rulează testele din `test/unit/` (`node:test`, fără dependențe noi; baze de date temporare, date inventate). Scripturile `test/*.cjs` sunt scripturi de acceptanță separate.

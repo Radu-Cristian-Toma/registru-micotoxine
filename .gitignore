@@ -5,3 +5,4 @@ db/lims.db-shm
 db/lims.db-wal
 *.log
 backup/
+digest/

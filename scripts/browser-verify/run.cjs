@@ -234,13 +234,21 @@ const open = async (page, code) => { await page.getByText(code).first().click();
       check('V15', 'Administrator 390 px: fără derulare orizontală a paginii', ok, 'toate filele încap în lățime', 'derulare orizontală în: ' + bad.join(', '));
       check('V15e', 'Administrator 390 px: erori de consolă', p.errors.length === 0, 'fără erori', p.errors.slice(0, 3).join(' | ')); await p.context().close();
     });
-    await step('V16', 'Validator: coada după respingere (etichetă de acțiune)', async () => {
+    await step('V16', 'Validator: proba returnată operatorului', async () => {
       const p = await loginUi(browser, s, 'validator');
       const t = await bodyText(p);
       const m = t.match(new RegExp(code(ids.E) + '[\\s\\S]{0,260}'));
-      const bad = m && /Pregătit pentru validare/.test(m[0]);
-      rec('V16', 'Validator: etichetă pentru probă returnată operatorului', bad ? 'FAIL' : 'PASS', bad ? 'proba respinsă la revizuire apare ca „Pregătit pentru validare” (ar trebui să indice returnarea către operator)' : 'etichetă corectă');
-      await p.context().close();
+      const rowOk = m && /Returnat/.test(m[0]) && !/Pregătit pentru validare/.test(m[0]);
+      check('V16a', 'Validator: eticheta din coadă pentru proba returnată', rowOk, 'rândul arată „Returnat”, nu „Pregătit pentru validare”', 'eticheta din coadă este încă înșelătoare');
+      await open(p, code(ids.E));
+      const d = await bodyText(p);
+      const noBtn = (await p.locator('#btn-next-action').count()) === 0;
+      check('V16b', 'Validator: cardul „următorul pas” pentru proba returnată', /Returnat operatorului/.test(d) && !/Dosarul este pregătit pentru validare/.test(d) && noBtn, 'cardul indică returnarea și nu oferă „Mergi la validare”', 'cardul este încă înșelător sau oferă un buton');
+      await shot(p, 'v16-validator-returnata'); await p.context().close();
+      const o = await loginUi(browser, s, 'operator'); await open(o, code(ids.E));
+      const od = await bodyText(o);
+      check('V16c', 'Operator: cardul pentru proba returnată', /Returnat operatorului/.test(od) && (await o.locator('#btn-next-action').count()) === 1, 'cardul indică returnarea și oferă butonul de corectare', 'cardul operatorului nu indică returnarea');
+      await o.context().close();
     });
   } finally {
     await browser.close(); s.stop();

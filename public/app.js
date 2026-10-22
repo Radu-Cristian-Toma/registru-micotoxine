@@ -2282,6 +2282,7 @@ function nextActionForSample(s, mode = 'operator') {
     return t('owner.nextActionReadyValidation');
   }
   if (s.validationStatus === 'validated') return t('operator.nextActionBulletinIssued');
+  if (s.reviewStatus === 'rejected') return t('operator.nextActionReturned');
   if (s.status === 'pending') return t('operator.nextActionEnterResults');
   if (s.qcStatus !== 'accepted' && s.qcStatus !== 'not_required') return t('operator.nextActionCheckQc');
   return t('operator.nextActionReadyValidation');
@@ -2289,6 +2290,8 @@ function nextActionForSample(s, mode = 'operator') {
 
 function actionClassForSample(s) {
   if (s.validationStatus === 'validated') return 'complete';
+  // Proba respinsa la revizuire se intoarce la operator; nu mai e "pentru validare" (nu si pentru beneficiar).
+  if (s.reviewStatus === 'rejected' && s.status !== 'cancelled' && currentUser && currentUser.role !== 'owner') return 'returned';
   // Etapa de "analiza" incepe la decizia de acceptare de la poarta de
   // intrare, nu la introducerea primei valori - aceeasi granita folosita
   // acum peste tot in aplicatie (filtre, casete de rezumat).
@@ -2306,6 +2309,7 @@ function actionClassForSample(s) {
 function queueRowStatusLabel(sample) {
   if (sample.status === 'cancelled') return t('common.cancelledStatus');
   if (sample.validationStatus === 'validated') return t('operator.validatedShort');
+  if (sample.reviewStatus === 'rejected') return t('operator.queueReturned');
   if (currentUser && currentUser.role === 'validator') {
     if (sample.reviewStatus === 'approved') return t('operator.guideValidatorStep2');
     if (sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required') return t('operator.guideValidatorStep1');
@@ -2329,10 +2333,12 @@ function renderNextActionCard(sample, mode = 'operator') {
     analysis: t('operator.nextActionDetailAnalysis'),
     qc: t('operator.nextActionDetailQc'),
     validation: t('operator.nextActionDetailValidation'),
+    returned: t('operator.nextActionDetailReturned'),
     complete: t('operator.nextActionDetailComplete')
   }[cls];
-  const actionButton = mode === 'operator' && cls !== 'complete'
-    ? `<button type="button" class="btn secondary next-action-button" id="btn-next-action">${cls === 'analysis' ? t('operator.nextActionButtonAnalysis') : cls === 'qc' ? t('operator.nextActionButtonQc') : t('operator.nextActionButtonValidation')}</button>`
+  // Pentru o proba returnata, doar operatorul are o actiune (corectarea); validatorul nu are buton.
+  const actionButton = mode === 'operator' && cls !== 'complete' && !(cls === 'returned' && currentUser.role !== 'operator')
+    ? `<button type="button" class="btn secondary next-action-button" id="btn-next-action">${cls === 'analysis' || cls === 'returned' ? t('operator.nextActionButtonAnalysis') : cls === 'qc' ? t('operator.nextActionButtonQc') : t('operator.nextActionButtonValidation')}</button>`
     : '';
   const kicker = isOwner ? t('owner.nextActionKicker') : t('operator.nextActionKicker');
   return `<div class="next-action-card ${cls}" aria-label="${escapeHtml(action)}"><div class="next-action-copy"><div class="next-action-kicker">${kicker}</div><strong>${escapeHtml(action)}</strong><p>${escapeHtml(detail)}</p></div>${actionButton}<span class="next-action-marker" aria-hidden="true">${cls==='complete'?'✓':'→'}</span></div>`;
@@ -2342,6 +2348,7 @@ function focusNextAction(sample) {
   const cls = actionClassForSample(sample);
   const targets = {
     analysis: 'f-analysisDate',
+    returned: 'f-analysisDate',
     qc: 'f-qcStatus',
     validation: 'btn-validate-results'
   };

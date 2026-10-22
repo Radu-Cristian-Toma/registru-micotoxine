@@ -829,14 +829,15 @@ function updateStaffGuideProgress(sample, role) {
     // de mai jos (vezi sampleProgress()/renderWorkflowRail()).
     const isReceived = !!sample.intakeCheckedAt;
     if (isValidator) {
-      const submittedToValidator = sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required';
+      // O proba respinsa la revizuire e din nou la operator, nu "la aprobare".
+      const submittedToValidator = (sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required') && sample.reviewStatus !== 'rejected';
       activeIndex = sample.validationStatus === 'validated' ? 4
         : sample.reviewStatus === 'approved' ? 3
         : submittedToValidator ? 2
         : isReceived ? 1
         : 0;
     } else {
-      const submittedToValidator = sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required';
+      const submittedToValidator = (sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required') && sample.reviewStatus !== 'rejected';
       const analysisStarted = ['afb1', 'afb2', 'afg1', 'afg2', 'ota', 'm1', 'don', 'zea', 'fum'].some(k => sample[k] !== null && sample[k] !== undefined);
       activeIndex = sample.validationStatus === 'validated' ? 4
         : submittedToValidator ? 3
@@ -881,7 +882,8 @@ function sampleProgress(sample) {
   const received = registration;
   const analysisStarted = ['afb1', 'afb2', 'afg1', 'afg2', 'ota', 'm1', 'don', 'zea', 'fum'].some(k => sample[k] !== null && sample[k] !== undefined);
   const analysis = registration && analysisStarted;
-  const qc = sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required';
+  // Proba respinsa la revizuire se intoarce la operator: QC redevine pasul curent pana la retrimitere.
+  const qc = (sample.qcStatus === 'accepted' || sample.qcStatus === 'not_required') && sample.reviewStatus !== 'rejected';
   const validation = sample.validationStatus === 'validated';
   return { received, registration, analysis, qc, validation };
 }
@@ -2253,10 +2255,10 @@ function renderOperatorWorkload() {
   // zone ale interfetei sa spuna aceeasi poveste.
   const isValidatorRole = currentUser && currentUser.role === 'validator';
   const pendingCount = isValidatorRole
-    ? activeClientQueue.filter(s => s.reviewStatus !== 'approved').length
+    ? activeClientQueue.filter(s => s.reviewStatus !== 'approved' && s.reviewStatus !== 'rejected').length
     : activeClientQueue.filter(s => !s.intakeCheckedAt).length;
   const inAnalysisCount = isValidatorRole
-    ? activeClientQueue.filter(s => s.reviewStatus === 'approved').length
+    ? activeClientQueue.filter(s => s.reviewStatus === 'approved' || s.reviewStatus === 'rejected').length
     : activeClientQueue.filter(s => s.intakeCheckedAt).length;
   strip.innerHTML = `
     <div class="workload-primary"><span class="eyebrow">${t('operator.workloadNow')}</span><strong>${activeClientQueue.length} ${t('operator.workloadInFlow')}</strong></div>
@@ -2376,11 +2378,11 @@ function renderOperatorList() {
     const isValidatorRole = currentUser && currentUser.role === 'validator';
     if (operatorQueueFilter === 'pending') {
       filtered = isValidatorRole
-        ? filtered.filter(s => s.reviewStatus !== 'approved' && s.status !== 'cancelled')
+        ? filtered.filter(s => s.reviewStatus !== 'approved' && s.reviewStatus !== 'rejected' && s.status !== 'cancelled')
         : filtered.filter(s => !s.intakeCheckedAt && s.status !== 'cancelled');
     } else if (operatorQueueFilter === 'in_analysis') {
       filtered = isValidatorRole
-        ? filtered.filter(s => s.reviewStatus === 'approved' && s.validationStatus !== 'validated' && s.status !== 'cancelled')
+        ? filtered.filter(s => (s.reviewStatus === 'approved' || s.reviewStatus === 'rejected') && s.validationStatus !== 'validated' && s.status !== 'cancelled')
         : filtered.filter(s => s.intakeCheckedAt && s.validationStatus !== 'validated' && s.status !== 'cancelled');
     } else if (operatorQueueFilter === 'validated') {
       filtered = filtered.filter(s => s.validationStatus === 'validated');

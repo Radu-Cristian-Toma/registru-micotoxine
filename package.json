@@ -9,7 +9,8 @@
     "release-check": "node scripts/release-check.js",
     "backup": "node scripts/backup-db.js",
     "test": "node --test \"test/unit/*.test.js\"",
-    "verify-integrity": "node scripts/verify-integrity.js"
+    "verify-integrity": "node scripts/verify-integrity.js",
+    "digest": "node scripts/export-digest.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.0",

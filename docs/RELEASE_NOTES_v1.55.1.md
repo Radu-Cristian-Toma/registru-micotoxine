@@ -1,6 +1,6 @@
 # Versiunea 1.55.1 — corecții ale traducerii, demo-ului și ghidului
 
-**Stare:** pilot, nevalidat și neacreditat. Nicio modificare a regulii de decizie, a valorilor limitelor, a parolelor sau a politicii de parole.
+**Stare:** pilot, nevalidat și neacreditat. **DOI:** https://doi.org/10.5281/zenodo.23781945. Nicio modificare a regulii de decizie, a valorilor limitelor, a parolelor sau a politicii de parole.
 
 ## Traducerea în engleză
 - **Sens:** „Așteaptă analizare” = „Awaiting analysis” (era „Awaiting review”); „Within uncertainty” în loc de „In uncertainty”.

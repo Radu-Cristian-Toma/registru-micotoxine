@@ -5,6 +5,6 @@
     { "name": "Toma, Radu Cristian", "affiliation": "Facultatea de Biotehnologii, Universitatea de Științe Agronomice și Medicină Veterinară București" }
   ],
   "license": "AGPL-3.0-or-later",
-  "description": "Open-source laboratory information system for mycotoxin conformity decisions (Regulation (EU) 2023/2782) with tamper-evident records and publicly verifiable bulletins. Pilot software, not validated or accredited.",
+  "description": "Open-source laboratory information system for mycotoxin conformity decisions (Regulation (EU) 2023/2782) with tamper-evident records and publicly verifiable test reports. Pilot software, not validated or accredited.",
   "keywords": ["mycotoxins", "laboratory information system", "conformity assessment", "data integrity"]
 }

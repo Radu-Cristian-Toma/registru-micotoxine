@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Registru Micotoxine Demo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,6 +61,8 @@ pre { margin: 12px 0; padding: 12px 14px; background: var(--surface); border: 1p
 body[data-lang="ro"] .en, body[data-lang="en"] .ro { display: none; }
 @media (prefers-reduced-motion: reduce) { .frame.on .shot { transform: none; transition: none; } .frame.on .ring { animation: none; } .seg.run i { animation-duration: .01s; } }
 </style>
+</head>
+<body>
 <div class="wrap" id="app">
   <header>
     <h1><span class="ro">Registru Micotoxine, demonstrație</span><span class="en">Mycotoxin Register, demo</span>
@@ -137,3 +144,5 @@ document.addEventListener('keydown', (e) => {
 const m = /^#scena-(\d+)$/.exec(location.hash); if (m) idx = Math.min(N, Math.max(1, +m[1])) - 1;
 setLang(lang); go(idx);
 </script>
+</body>
+</html>

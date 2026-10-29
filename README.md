@@ -1,4 +1,4 @@
-# Registru Micotoxine — v1.53.5
+# Registru Micotoxine — v1.54.0
 
 LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine, în dezvoltare activă către un pilot de laborator.
 
@@ -127,6 +127,8 @@ Lanțul singur nu împiedică un atacator cu acces la fișierul bazei de date s�
 
 `docs/DEMO_SCRIPT.md` — scenariu scurt de demonstrație, pe roluri.
 
+`docs/INSTALARE_PILOT.md` — instalare, operare, copii de siguranță criptate, actualizare; `docs/LISTA_VERIFICARE_LABORATOR.md` — ce trebuie stabilit de laborator înainte de date reale; `docs/VALIDARE_PILOT.md` — șablon al protocolului de validare; `docs/INDEX_TESTE.md` — indexul testelor automate (`npm run list-tests`); `docs/ETAPA_D1_FUNCTII.md`, `docs/ETAPA_D2_VERDICT_PRELIMINAR.md`, `docs/ETAPA_D3_SECURIZARE.md` — etapele de încheiere; `docs/RELEASE_NOTES_v1.54.md`.
+
 ## Verificare release
 
 Rulați:
@@ -136,6 +138,8 @@ Rulați:
 Verificarea confirmă structura fișierelor, sincronizarea versiunilor (`package.json`/`package-lock.json`/README) și sintaxa JavaScript.
 
 ## Statut
+
+v1.54.0 încheie etapele de funcții (loturi cu mai multe probe, verificare publică în stări, export JSON), de verdict preliminar (ascuns beneficiarului până la validare) și de securizare; vezi `docs/RELEASE_NOTES_v1.54.md`. Aplicația rămâne **pilot**, fără validare sau acreditare.
 
 v1.53.5 a corectat termenul de livrare (TAT) afișat pentru o probă deja încheiată: pentru o probă anulată la controlul de calitate, coada operatorului continua să arate „⚠ Termen: ..." cu stilul de avertizare de termen depășit, ca și cum analiza ar mai fi în curs — deși situația era deja definitiv închisă. Funcția care calculează starea termenului verifica doar dacă proba fusese validată (buletin emis), nu și dacă fusese anulată. Corectată să trateze ambele situații de final identic — nu mai afișează termenul de livrare pentru nicio probă încheiată (validată sau anulată), doar pentru cele încă în lucru, unde continuă să avertizeze corect la termen apropiat sau depășit.
 

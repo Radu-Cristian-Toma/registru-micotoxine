@@ -110,7 +110,7 @@ table { border-collapse: collapse; width: 100%; margin: 6pt 0; break-inside: avo
 
 <div class="pb"></div>
 ${h(1, 'Ce face aplicația și ce nu face', 'What the application does and does not do')}
-${bi('Aplicația ține registrul probelor de micotoxine: înregistrarea probei de către beneficiar, recepția și introducerea rezultatelor de către operator, aprobarea și validarea independentă, emiterea buletinului cu cod QR și verificarea publică a autenticității. Fiecare acțiune intră într-un jurnal cu lanț de amprente SHA-256, iar rezultatele corectate păstrează versiunile anterioare.', 'The application keeps the mycotoxin sample register: sample registration by the customer, reception and result entry by the operator, independent approval and validation, issue of a bulletin with a QR code, and public verification of authenticity. Every action enters a SHA-256 fingerprint-chained log, and corrected results keep their earlier versions.')}
+${bi('Aplicația ține registrul probelor de micotoxine: înregistrarea probei de către beneficiar, recepția și introducerea rezultatelor de către operator, aprobarea și validarea independentă, emiterea buletinului cu cod QR și verificarea publică a autenticității. Fiecare acțiune intră într-un jurnal cu lanț de amprente SHA-256, iar rezultatele corectate păstrează versiunile anterioare.', 'The application keeps the mycotoxin sample register: sample registration by the customer, reception and result entry by the operator, independent approval and validation, issue of a test report with a QR code, and public verification of authenticity. Every action enters a SHA-256 fingerprint-chained log, and corrected results keep their earlier versions.')}
 ${li([
   ['Decizia de conformitate se calculează după limita aplicabilă și regula aleasă („simplă” sau cea din Reg. (UE) 2023/2782, cu incertitudine extinsă).', 'The conformity decision is computed against the applicable limit and the chosen rule (“simple” or the one in Reg. (EU) 2023/2782, with expanded uncertainty).'],
   ['Pentru loturi cu mai multe probe de laborator, decizia de lot se ia după anexa I, partea II (nicio probă peste limită, sau media).', 'For lots with several laboratory samples, the lot decision follows Annex I, Part II (no sample above the limit, or the mean).'],
@@ -148,14 +148,14 @@ ${h(4, 'Fluxul unei probe', 'The flow of a sample')}
 <tr><td>2</td><td>Operator</td><td>Recepție (ambalaj, cantitate, temperatură): acceptă sau respinge proba. / Reception (packaging, quantity, temperature): accepts or rejects.</td></tr>
 <tr><td>3</td><td>Operator</td><td>Introduce rezultatele, metoda, aparatul și controlul de calitate; trimite spre validare. / Enters results, method, equipment and quality control; submits for validation.</td></tr>
 <tr><td>4</td><td>Validator</td><td>Aprobă sau returnează rezultatele (revizuire independentă). / Approves or returns the results (independent review).</td></tr>
-<tr><td>5</td><td>Alt validator / Another validator</td><td>Validează și emite buletinul (cu separarea sarcinilor activă, cine a aprobat nu validează, iar administratorul nu validează). / Validates and issues the bulletin (with segregation of duties on, the approver cannot validate and the administrator does not validate).</td></tr>
-<tr><td>6</td><td>Beneficiar / Customer</td><td>Vede valorile și verdictul numai după validare; poate verifica buletinul prin codul QR. / Sees values and verdict only after validation; can verify the bulletin through the QR code.</td></tr></table>
+<tr><td>5</td><td>Alt validator / Another validator</td><td>Validează și emite buletinul (cu separarea sarcinilor activă, cine a aprobat nu validează, iar administratorul nu validează). / Validates and issues the test report (with segregation of duties on, the approver cannot validate and the administrator does not validate).</td></tr>
+<tr><td>6</td><td>Beneficiar / Customer</td><td>Vede valorile și verdictul numai după validare; poate verifica buletinul prin codul QR. / Sees values and verdict only after validation; can verify the test report through the QR code.</td></tr></table>
 
 ${h(5, 'Beneficiarul', 'The customer')}
 ${f('owner-list', 'Lista probelor beneficiarului. Înainte de validare apar doar starea („în analiză”), nu valorile sau verdictul.', 'The customer’s sample list. Before validation only the status (“in analysis”) appears, not values or verdict.')}
 ${f('owner-new', 'Înregistrarea unei probe noi: denumire, categorie, data recoltării și atestarea prelevării.', 'Registering a new sample: name, category, sampling date and attestation of sampling.')}
-${f('owner-bulletin', 'Buletinul validat: stare, cod QR de verificare, verdictul și, mai jos, rezultatele, incertitudinea și regula de decizie.', 'The validated bulletin: status, verification QR code, the verdict and, below, the results, the uncertainty and the decision rule.')}
-${f('owner-archive', 'Arhiva: probele încheiate, cu export CSV; pentru buletinele emise există și exportul JSON al rezultatului.', 'Archive: finished samples, with CSV export; for issued bulletins there is also a JSON export of the result.')}
+${f('owner-bulletin', 'Buletinul validat: stare, cod QR de verificare, verdictul și, mai jos, rezultatele, incertitudinea și regula de decizie.', 'The validated test report: status, verification QR code, the verdict and, below, the results, the uncertainty and the decision rule.')}
+${f('owner-archive', 'Arhiva: probele încheiate, cu export CSV; pentru buletinele emise există și exportul JSON al rezultatului.', 'Archive: finished samples, with CSV export; for issued test reports there is also a JSON export of the result.')}
 
 <div class="pb"></div>
 ${h(6, 'Operatorul', 'The operator')}
@@ -170,20 +170,20 @@ ${f('op-lots', 'Constituirea unui lot din 2–10 probe de laborator ale aceluia�
 
 <div class="pb"></div>
 ${h(7, 'Validatorul', 'The validator')}
-${f('validator', 'Revizuirea unei probe trimise spre validare: aprobare sau returnare cu notă. Validarea finală și emiterea buletinului le face un alt validator.', 'Reviewing a sample submitted for validation: approval or return with a note. Final validation and bulletin issue are done by another validator.')}
-${bi('Un buletin emis poate fi <b>retras</b> sau <b>înlocuit</b> de un validator, cu motiv obligatoriu; pagina publică de verificare arată starea („înlocuit”, „retras”) fără a afișa rezultatele.', 'An issued bulletin can be <b>withdrawn</b> or <b>superseded</b> by a validator, with a mandatory reason; the public verification page shows the state (“superseded”, “withdrawn”) without showing results.')}
+${f('validator', 'Revizuirea unei probe trimise spre validare: aprobare sau returnare cu notă. Validarea finală și emiterea buletinului le face un alt validator.', 'Reviewing a sample submitted for validation: approval or return with a note. Final validation and test report issue are done by another validator.')}
+${bi('Un buletin emis poate fi <b>retras</b> sau <b>înlocuit</b> de un validator, cu motiv obligatoriu; pagina publică de verificare arată starea („înlocuit”, „retras”) fără a afișa rezultatele.', 'An issued test report can be <b>withdrawn</b> or <b>superseded</b> by a validator, with a mandatory reason; the public verification page shows the state (“superseded”, “withdrawn”) without showing results.')}
 
 <div class="pb"></div>
 ${h(8, 'Administratorul', 'The administrator')}
 ${f('admin-dashboard', 'Tabloul de bord: probele în flux, termenele de livrare și indicatorii laboratorului.', 'The dashboard: samples in progress, delivery deadlines and laboratory indicators.')}
 ${f('admin-users', 'Conturile de operator și validator; resetarea unei parole generează o parolă temporară afișată o singură dată.', 'Operator and validator accounts; resetting a password generates a temporary password shown once.')}
 ${f('admin-quality', 'Setări de calitate: separarea sarcinilor, intervalul maxim între controale QC, retenția [de completat de laborator]; modificările se jurnalizează.', 'Quality settings: segregation of duties, maximum interval between QC controls, retention [to be completed by the laboratory]; changes are logged.')}
-${f('admin-bulletin', 'Antetul buletinului: denumirea laboratorului, logo, semnătură și ștampilă încărcate de laborator.', 'Bulletin header: laboratory name, logo, signature and stamp uploaded by the laboratory.')}
+${f('admin-bulletin', 'Antetul buletinului: denumirea laboratorului, logo, semnătură și ștampilă încărcate de laborator.', 'Test report header: laboratory name, logo, signature and stamp uploaded by the laboratory.')}
 
 <div class="pb"></div>
-${h(9, 'Verificarea publică a buletinului', 'Public bulletin verification')}
-${f('verify', 'Pagina deschisă prin codul QR (aici pe un ecran de telefon): arată dacă buletinul este autentic, modificat, lipsă sau neverificabil, fără a expune valorile.', 'The page opened through the QR code (here on a phone screen): it shows whether the bulletin is authentic, modified, missing or unverifiable, without exposing values.', 'narrow')}
-${bi('Codul QR conține numărul buletinului și o amprentă scurtă (16 caractere) a conținutului emis. Dacă datele s-au schimbat după emitere, pagina arată „modificat”.', 'The QR code carries the bulletin number and a short fingerprint (16 characters) of the issued content. If the data changed after issue, the page shows “modified”.')}
+${h(9, 'Verificarea publică a buletinului', 'Public test report verification')}
+${f('verify', 'Pagina deschisă prin codul QR (aici pe un ecran de telefon): arată dacă buletinul este autentic, modificat, lipsă sau neverificabil, fără a expune valorile.', 'The page opened through the QR code (here on a phone screen): it shows whether the test report is authentic, modified, missing or unverifiable, without exposing values.', 'narrow')}
+${bi('Codul QR conține numărul buletinului și o amprentă scurtă (16 caractere) a conținutului emis. Dacă datele s-au schimbat după emitere, pagina arată „modificat”.', 'The QR code carries the test report number and a short fingerprint (16 characters) of the issued content. If the data changed after issue, the page shows “modified”.')}
 
 ${h(10, 'Decizia de conformitate', 'The conformity decision')}
 ${li([

@@ -3,12 +3,15 @@
 // urmata de verificarea de integritate a copiei.
 //
 // Utilizare: node scripts/backup-db.js [director-destinatie]
+//            node scripts/backup-db.js --encrypt [director-destinatie]   (copie criptata .db.enc; parola din LIMS_BACKUP_PASSPHRASE)
+//            node scripts/backup-db.js --decrypt <fisier.db.enc> <iesire.db>   (decriptare + verificare)
 //            node scripts/backup-db.js --verify <fisier.db>   (doar verificare)
 // Variabile de mediu: LIMS_DB_PATH (baza sursa; implicit db/lims.db).
 // Iesire: cod 0 daca copia este valida, 1 in caz contrar.
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { encryptFile, decryptFile } = require('./backup-crypto');
 
 function timestamp(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
@@ -53,9 +56,45 @@ async function backupDatabase(sourcePath, destDir) {
   return { destPath, bytes: fs.statSync(destPath).size, check };
 }
 
-module.exports = { backupDatabase, verifyDatabase };
+// Sterge un fisier .db si fisierele-satelit SQLite (-wal, -shm, -journal) create la verificare.
+function removeWithSidecars(file) {
+  for (const f of [file, file + '-wal', file + '-shm', file + '-journal']) {
+    try { fs.unlinkSync(f); } catch (_) { /* inexistent */ }
+  }
+}
 
-if (require.main === module && process.argv[2] === '--verify') {
+// Copie criptata: se face copia verificata, se cripteaza, iar copia in clar se sterge.
+async function backupEncrypted(sourcePath, destDir, passphrase) {
+  const r = await backupDatabase(sourcePath, destDir);
+  const encPath = r.destPath + '.enc';
+  try {
+    encryptFile(r.destPath, encPath, passphrase);
+  } catch (err) {
+    removeWithSidecars(r.destPath);
+    throw err;
+  }
+  removeWithSidecars(r.destPath);
+  return { destPath: encPath, bytes: fs.statSync(encPath).size, check: r.check };
+}
+
+module.exports = { backupDatabase, verifyDatabase, backupEncrypted };
+
+if (require.main === module && process.argv[2] === '--decrypt') {
+  const [inFile, outFile] = [process.argv[3], process.argv[4]];
+  if (!inFile || !outFile) { console.error('Utilizare: node scripts/backup-db.js --decrypt <fisier.db.enc> <iesire.db>'); process.exit(1); }
+  try {
+    decryptFile(inFile, outFile, process.env.LIMS_BACKUP_PASSPHRASE);
+    const r = verifyDatabase(outFile);
+    if (!r.ok) { fs.unlinkSync(outFile); throw new Error('Copia decriptată nu a trecut verificarea de integritate și a fost ștearsă.'); }
+    console.log(`Decriptat și verificat: ${outFile}`);
+  } catch (err) { console.error(`Decriptare eșuată: ${err.message}`); process.exit(1); }
+} else if (require.main === module && process.argv[2] === '--encrypt') {
+  const source = process.env.LIMS_DB_PATH || path.join(__dirname, '..', 'db', 'lims.db');
+  const destDir = process.argv[3] || path.join(__dirname, '..', 'backup');
+  backupEncrypted(source, destDir, process.env.LIMS_BACKUP_PASSPHRASE)
+    .then(r => console.log(`Backup criptat și verificat înainte de criptare: ${r.destPath} (${r.bytes} octeți)`))
+    .catch(err => { console.error(`Backup criptat eșuat: ${err.message}`); process.exit(1); });
+} else if (require.main === module && process.argv[2] === '--verify') {
   const file = process.argv[3];
   if (!file) { console.error('Utilizare: node scripts/backup-db.js --verify <fisier.db>'); process.exit(1); }
   const r = verifyDatabase(file);

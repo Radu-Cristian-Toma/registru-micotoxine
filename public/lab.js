@@ -49,6 +49,16 @@
       ltIssueU: D('probele au incertitudini diferite', 'samples have different uncertainties'), ltIssueIncomplete: D('lipsește o valoare', 'a value is missing'),
       ltIssueLimitMissing: D('limită lipsă la unele probe', 'limit missing for some samples'),
       ltInLot: D('Probă în lotul', 'Sample in lot'),
+      // parole (etapa D3)
+      pwdBtn: D('Parola', 'Password'), pwdTitle: D('Schimbarea parolei', 'Change password'), pwdForcedTitle: D('Alege o parolă nouă', 'Choose a new password'),
+      pwdForcedIntro: D('Contul folosește o parolă temporară, setată de administrator. Alege o parolă nouă înainte de a continua.', 'This account uses a temporary password set by the administrator. Choose a new password before continuing.'),
+      pwdCurrent: D('Parola curentă', 'Current password'), pwdNew: D('Parola nouă (minimum 8 caractere)', 'New password (minimum 8 characters)'), pwdConfirm: D('Repetă parola nouă', 'Repeat the new password'),
+      pwdSave: D('Salvează parola', 'Save password'), pwdCancel: D('Anulează', 'Cancel'), pwdMismatch: D('Parolele noi nu coincid.', 'The new passwords do not match.'), pwdChanged: D('Parola a fost schimbată.', 'Password changed.'),
+      pwdLogout: D('Ieșire', 'Log out'),
+      rstTitle: D('Resetarea parolei unui cont', 'Reset an account password'),
+      rstIntro: D('Se generează o parolă temporară, afișată o singură dată; contul trebuie să o schimbe la prima autentificare, iar sesiunile lui deschise se închid. Transmiteți parola temporară pe un canal separat, nu prin același mesaj cu adresa de email.', 'A temporary password is generated and shown once; the account must change it at its first login, and its open sessions are closed. Send the temporary password through a separate channel, not in the same message as the email address.'),
+      rstEmail: D('Email-ul contului', 'Account email'), rstBtn: D('Resetează parola', 'Reset password'),
+      rstResult: D('Parola temporară (se afișează o singură dată)', 'Temporary password (shown once)'), rstConfirm: D('Resetezi parola acestui cont?', 'Reset this account’s password?'),
       // formular rezultat
       extrasTitle: D('Date de laborator și trasabilitate', 'Laboratory data and traceability'),
       basis: D('Baza de raportare', 'Reporting basis'), basisAsIs: D('Masă proaspătă (ca atare)', 'As received (fresh mass)'), basisDry: D('Substanță uscată', 'Dry matter'),
@@ -430,6 +440,67 @@
       try { await api(`/lab/reagent-lots/${b.dataset.id}`, { method: 'PUT', body: JSON.stringify({ status: b.dataset.status }) }); await done(); } catch (e) { fail(e); }
     }));
   }
+
+  // --- parole (etapa D3) -----------------------------------------------------------------
+  function passwordFormHtml(forced) {
+    return `${forced ? `<p class="section-hint">${L('pwdForcedIntro')}</p>` : ''}
+      ${fld('pwd-current', L('pwdCurrent'), 'password', 'autocomplete="current-password"')}
+      ${fld('pwd-new', L('pwdNew'), 'password', 'autocomplete="new-password" minlength="8"')}
+      ${fld('pwd-confirm', L('pwdConfirm'), 'password', 'autocomplete="new-password" minlength="8"')}`;
+  }
+  async function submitPasswordChange() {
+    const cur = document.getElementById('pwd-current').value, nw = document.getElementById('pwd-new').value, cf = document.getElementById('pwd-confirm').value;
+    if (nw !== cf) { showToast(L('pwdMismatch')); return false; }
+    try {
+      const r = await api('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: cur, newPassword: nw }) });
+      if (r.csrfToken) csrfToken = r.csrfToken;
+      if (r.user) currentUser = r.user;
+      showToast(L('pwdChanged'));
+      return true;
+    } catch (err) { showToast(String(err.message || err)); return false; }
+  }
+  window.openPasswordDialog = function () {
+    document.getElementById('password-dialog')?.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'password-dialog'; wrap.className = 'modal-backdrop';
+    wrap.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-head"><div><h2>${L('pwdTitle')}</h2></div><button class="icon-button" id="pwd-close" aria-label="${L('pwdCancel')}">×</button></div>
+      ${passwordFormHtml(false)}
+      <div class="modal-actions"><button class="btn secondary" id="pwd-cancel">${L('pwdCancel')}</button><button class="btn primary-action" id="pwd-save">${L('pwdSave')}</button></div></div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    document.getElementById('pwd-close').addEventListener('click', close);
+    document.getElementById('pwd-cancel').addEventListener('click', close);
+    document.getElementById('pwd-save').addEventListener('click', async () => { if (await submitPasswordChange()) close(); });
+    document.getElementById('pwd-current').focus();
+  };
+  // Cont cu parolă temporară: ecran dedicat, fără acces la restul aplicației până la schimbare.
+  window.renderForcedPasswordScreen = function () {
+    app.innerHTML = `<div class="auth-wrap"><div class="auth-card"><h1>${L('pwdForcedTitle')}</h1>
+      ${passwordFormHtml(true)}
+      <div class="modal-actions"><button class="btn secondary" id="pwd-logout">${L('pwdLogout')}</button><button class="btn primary-action" id="pwd-save">${L('pwdSave')}</button></div></div></div>`;
+    document.getElementById('pwd-save').addEventListener('click', async () => { if (await submitPasswordChange()) render(); });
+    document.getElementById('pwd-logout').addEventListener('click', () => logout());
+  };
+  window.renderPasswordResetCard = function () {
+    const root = document.getElementById('admin-view-root');
+    if (!root) return;
+    const card = document.createElement('div');
+    card.className = 'admin-panel view-transition lab-card';
+    card.innerHTML = `<div class="admin-section-head"><div><h2>${L('rstTitle')}</h2><p class="section-hint">${L('rstIntro')}</p></div></div>
+      <div class="lab-grid">${fld('rst-email', L('rstEmail'), 'email', 'autocomplete="off"')}</div>
+      <button class="btn" id="btn-rst">${L('rstBtn')}</button><div id="rst-result" class="section-hint" aria-live="polite"></div>`;
+    root.prepend(card);
+    document.getElementById('btn-rst').addEventListener('click', async () => {
+      const email = document.getElementById('rst-email').value.trim();
+      if (!email || !window.confirm(L('rstConfirm'))) return;
+      try {
+        const r = await api('/admin/users/reset-password', { method: 'POST', body: JSON.stringify({ email }) });
+        document.getElementById('rst-result').innerHTML = `${esc(r.email)} (${esc(r.role)}): ${L('rstResult')}: <strong class="mono" id="rst-temp">${esc(r.temporaryPassword)}</strong>`;
+        document.getElementById('rst-email').value = '';
+      } catch (err) { showToast(String(err.message || err)); }
+    });
+  };
 
   // --- politici (administrator) -----------------------------------------------------------
   window.renderPolicyCard = async function () {

@@ -4,7 +4,9 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const db = require('../db/database');
 const { requireLogin } = require('../middleware/auth');
-const { loginRateLimit, recordFailedAttempt, clearAttempts } = require('../middleware/rate-limit');
+const { loginRateLimit, recordFailedAttempt, clearAttempts, accountLocked, recordFailedAccount, clearAccount } = require('../middleware/rate-limit');
+const { logEvent } = require('../db/audit');
+require('../db/session-store'); // tabela de sesiuni (închiderea sesiunilor la schimbarea parolei)
 
 const router = express.Router();
 
@@ -40,24 +42,67 @@ router.post('/register', (req, res) => {
   });
 });
 
+const LOCK_MESSAGE = 'Prea multe încercări de autentificare. Încearcă din nou peste 15 minute.';
+
 router.post('/login', loginRateLimit, (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Completează email și parolă.' });
   }
+  const normalized = String(email).toLowerCase().trim();
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  // D3: blocare pe cont (în plus față de limita pe IP); răspunsul nu diferă pentru conturi inexistente.
+  if (accountLocked(normalized)) {
+    return res.status(429).json({ error: LOCK_MESSAGE });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(normalized);
+  if (!user || typeof password !== 'string' || !bcrypt.compareSync(password, user.password_hash)) {
     recordFailedAttempt(req);
+    const lockedNow = recordFailedAccount(normalized);
+    // Jurnal de securitate: nu se păstrează textul introdus (poate fi o parolă tastată în câmpul de email).
+    logEvent(user ? user.id : null, 'login_failed', { knownAccount: !!user });
+    if (lockedNow) logEvent(user ? user.id : null, 'account_locked', { knownAccount: !!user, minutes: 15 });
     return res.status(401).json({ error: 'Email sau parolă incorectă.' });
   }
   clearAttempts(req);
+  clearAccount(normalized);
 
   req.session.regenerate((err) => {
     if (err) return res.status(500).json({ error: 'Nu s-a putut inițializa sesiunea.' });
-    req.session.user = { id: user.id, email: user.email, fullName: user.full_name, role: user.role };
+    req.session.user = { id: user.id, email: user.email, fullName: user.full_name, role: user.role, mustChangePassword: !!user.must_change_password };
     req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    logEvent(user.id, 'login_success', null);
     res.json({ user: req.session.user, csrfToken: req.session.csrfToken });
+  });
+});
+
+// D3: schimbarea parolei de către utilizatorul autentificat. Regula de lungime este cea existentă
+// (minimum 8 caractere, ca la înregistrare); nu se introduce o politică nouă.
+router.post('/change-password', requireLogin, loginRateLimit, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || !currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Completează parola curentă și parola nouă.' });
+  }
+  if (newPassword.length < 8) return res.status(400).json({ error: 'Parola trebuie să aibă minimum 8 caractere.' });
+  const user = db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(req.session.user.id);
+  if (!user || !bcrypt.compareSync(currentPassword, user.password_hash)) {
+    recordFailedAttempt(req);
+    logEvent(req.session.user.id, 'password_change_failed', null);
+    return res.status(401).json({ error: 'Parola curentă este incorectă.' });
+  }
+  if (newPassword === currentPassword) return res.status(400).json({ error: 'Parola nouă trebuie să difere de cea curentă.' });
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(bcrypt.hashSync(newPassword, 12), user.id);
+  logEvent(user.id, 'password_changed', null);
+  clearAttempts(req);
+  // Toate sesiunile contului se închid (inclusiv cea curentă, care se reînnoiește imediat mai jos).
+  db.prepare("DELETE FROM sessions WHERE json_extract(data, '$.user.id') = ?").run(user.id);
+  const prev = req.session.user;
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).json({ error: 'Nu s-a putut reînnoi sesiunea.' });
+    req.session.user = { ...prev, mustChangePassword: false };
+    req.session.csrfToken = crypto.randomBytes(32).toString('hex');
+    res.json({ ok: true, user: req.session.user, csrfToken: req.session.csrfToken });
   });
 });
 

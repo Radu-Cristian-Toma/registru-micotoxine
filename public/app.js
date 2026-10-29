@@ -608,6 +608,8 @@ async function boot() {
 function render() {
   if (!currentUser) {
     renderAuth();
+  } else if (currentUser.mustChangePassword) {
+    renderForcedPasswordScreen();
   } else if (currentUser.role === 'owner') {
     renderOwnerApp();
   } else if (currentUser.role === 'operator' || currentUser.role === 'validator') {
@@ -726,7 +728,7 @@ function renderHeader(subtitle, roleLabel, roleClass, tabs) {
         ${langToggleHtml}
         <span class="role-badge ${roleClass}">${roleLabel}</span>
         <span>${escapeHtml(currentUser.fullName)}</span>
-        ${currentUser.role === 'owner' ? `<button class="btn secondary small-btn" id="btn-company">${t('owner.companyBtn')}</button>` : ''}<button class="btn secondary" id="btn-logout">${t('common.logout')}</button>
+        ${currentUser.role === 'owner' ? `<button class="btn secondary small-btn" id="btn-company">${t('owner.companyBtn')}</button>` : ''}<button class="btn secondary small-btn" id="btn-password">${t('lab.pwdBtn')}</button><button class="btn secondary" id="btn-logout">${t('common.logout')}</button>
       </div>
     </header>
   `;
@@ -855,6 +857,7 @@ function updateStaffGuideProgress(sample, role) {
 }
 function attachLogout() {
   document.getElementById('btn-logout').addEventListener('click', logout);
+  document.getElementById('btn-password')?.addEventListener('click', () => window.openPasswordDialog());
   document.getElementById('btn-ux-test')?.addEventListener('click', () => renderUxTestPanel());
   document.getElementById('btn-company')?.addEventListener('click', () => openCompanyDialog());
   document.getElementById('header-lang-toggle')?.addEventListener('click', () => {
@@ -4081,6 +4084,7 @@ async function renderAdminViewRoot() {
   }
   if (adminView === 'quality') {
     renderQualityView();
+    window.renderPasswordResetCard();
     await renderPolicyCard();
     await renderValidationPanel();
     await renderIncidentPanel();

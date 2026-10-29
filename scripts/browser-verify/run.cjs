@@ -320,6 +320,51 @@ const open = async (page, code) => { await page.getByText(code).first().click();
       fs.writeFileSync(path.join(OUT, 'v20-buletin-H.txt'), txt);
       await p.context().close();
     });
+    // ---------- Etapa D3: parole și antete de securitate ----------
+    await step('V21', 'Schimbarea parolei din interfață', async () => {
+      const email = 'parola.test@verify.invalid'; const pw1 = 'ParolaVeche-12345'; const pw2 = 'ParolaNoua-67890';
+      must(await sc.admin.call('POST', '/admin/operators', { email, password: pw1, fullName: 'Operator parolă (verificare)' }), 'creare cont');
+      const login = async (pw) => {
+        const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage();
+        await page.goto(s.base); await page.fill('#email', email); await page.fill('#password', pw);
+        await page.click('#auth-form button[type=submit]'); await page.waitForTimeout(1200);
+        return { page, ctx, ok: await page.locator('#btn-logout').count() > 0 };
+      };
+      const a = await login(pw1);
+      await a.page.click('#btn-password'); await a.page.waitForSelector('#pwd-save');
+      await a.page.fill('#pwd-current', pw1); await a.page.fill('#pwd-new', pw2); await a.page.fill('#pwd-confirm', pw2);
+      await a.page.click('#pwd-save'); await a.page.waitForTimeout(1200);
+      const closed = (await a.page.locator('#password-dialog').count()) === 0;
+      await shot(a.page, 'v21-parola-schimbata'); await a.ctx.close();
+      const old = await login(pw1); const oldRejected = !old.ok; await old.ctx.close();
+      const neu = await login(pw2); const newOk = neu.ok; await neu.ctx.close();
+      check('V21', 'Schimbarea parolei din interfață', a.ok && closed && oldRejected && newOk, 'dialogul se închide, parola veche este refuzată, cea nouă funcționează', `autentificare inițială ${a.ok} · dialog închis ${closed} · veche refuzată ${oldRejected} · nouă acceptată ${newOk}`);
+    });
+    await step('V22', 'Resetarea parolei de către administrator și schimbarea obligatorie', async () => {
+      const email = 'reset.test@verify.invalid'; const pw1 = 'ParolaVeche-12345'; const pw2 = 'ParolaNoua-67890';
+      must(await sc.admin.call('POST', '/admin/operators', { email, password: pw1, fullName: 'Operator resetare (verificare)' }), 'creare cont');
+      const adm = await loginUi(browser, s, 'admin');
+      await adm.getByRole('button', { name: 'Calitate', exact: true }).click(); await adm.waitForSelector('#btn-rst', { timeout: 8000 });
+      adm.on('dialog', d => d.accept());
+      await adm.fill('#rst-email', email); await adm.click('#btn-rst'); await adm.waitForSelector('#rst-temp', { timeout: 8000 });
+      const temp = (await adm.innerText('#rst-temp')).trim();
+      await shot(adm, 'v22-admin-resetare'); await adm.context().close();
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage();
+      await page.goto(s.base); await page.fill('#email', email); await page.fill('#password', temp);
+      await page.click('#auth-form button[type=submit]'); await page.waitForTimeout(1200);
+      const forced = /Alege o parolă nouă|Choose a new password/.test(await bodyText(page)) && (await page.locator('#btn-logout').count()) === 0;
+      await page.fill('#pwd-current', temp); await page.fill('#pwd-new', pw2); await page.fill('#pwd-confirm', pw2);
+      await page.click('#pwd-save'); await page.waitForTimeout(1500);
+      const after = (await page.locator('#btn-logout').count()) > 0;
+      await shot(page, 'v22-dupa-schimbare'); await ctx.close();
+      check('V22', 'Resetare de administrator + schimbare obligatorie', /^[A-Za-z0-9]{14}$/.test(temp) && forced && after, 'parolă temporară de 14 caractere; ecranul de schimbare obligatorie blochează aplicația; după schimbare aplicația se deschide', `temporară ${temp.length} car. · ecran obligatoriu ${forced} · aplicație după schimbare ${after}`);
+    });
+    await step('V23', 'Antete de securitate', async () => {
+      const r1 = await fetch(s.base + '/'); const r2 = await fetch(s.base + '/api/auth/me');
+      const csp = r1.headers.get('content-security-policy') || ''; const nc = r2.headers.get('cache-control') || '';
+      const hsts = r1.headers.get('strict-transport-security');
+      check('V23', 'Antete de securitate', /frame-ancestors 'self'/.test(csp) && /no-store/.test(nc) && !hsts && r1.headers.get('x-content-type-options') === 'nosniff', 'CSP (frame-ancestors, base-uri, form-action, object-src), no-store pe /api, fără HSTS în dezvoltare', `CSP „${csp}” · Cache-Control „${nc}” · HSTS ${hsts}`);
+    });
   } finally {
     await browser.close(); s.stop();
   }

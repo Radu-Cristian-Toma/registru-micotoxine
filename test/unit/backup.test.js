@@ -63,3 +63,49 @@ test('baza sursă inexistentă produce eroare, fără fișier de destinație', a
   await assert.rejects(() => backupDatabase(path.join(tmp, 'nu-exista.db'), path.join(tmp, 'out3')), /nu există/);
   assert.equal(fs.existsSync(path.join(tmp, 'out3')), false);
 });
+
+// Etapa D3: copie criptată (AES-256-GCM, parolă din mediu).
+const { backupEncrypted } = require('../../scripts/backup-db');
+const { encryptFile, decryptFile } = require('../../scripts/backup-crypto');
+const { spawnSync } = require('child_process');
+
+test('copie criptată: fișierul nu conține datele în clar, se decriptează cu parola corectă și trece verificarea', async () => {
+  const { db, file } = makeSource();
+  const r = await backupEncrypted(file, path.join(tmp, 'enc1'), 'parola-de-test-lunga');
+  assert.ok(r.destPath.endsWith('.db.enc'));
+  assert.equal(fs.readdirSync(path.join(tmp, 'enc1')).filter(f => !f.endsWith('.enc')).length, 0, 'copia în clar trebuie ștearsă');
+  const raw = fs.readFileSync(r.destPath);
+  assert.ok(!raw.includes('SQLite format 3'), 'antetul SQLite nu trebuie să apară în fișierul criptat');
+  const out = path.join(tmp, 'restored.db');
+  decryptFile(r.destPath, out, 'parola-de-test-lunga');
+  assert.ok(verifyDatabase(out).ok);
+  const copy = new Database(out, { readonly: true });
+  assert.equal(copy.prepare('SELECT COUNT(*) n FROM child').get().n, 3);
+  copy.close(); db.close();
+});
+
+test('copie criptată: parolă greșită, fișier modificat și parolă prea scurtă sunt refuzate', async () => {
+  const { db, file } = makeSource();
+  const r = await backupEncrypted(file, path.join(tmp, 'enc2'), 'parola-de-test-lunga');
+  assert.throws(() => decryptFile(r.destPath, path.join(tmp, 'x1.db'), 'parola-gresita-lunga'), /parola este greșită sau fișierul a fost modificat/);
+  const tampered = fs.readFileSync(r.destPath); tampered[tampered.length - 1] ^= 1;
+  const t = path.join(tmp, 'tampered.db.enc'); fs.writeFileSync(t, tampered);
+  assert.throws(() => decryptFile(t, path.join(tmp, 'x2.db'), 'parola-de-test-lunga'), /modificat/);
+  await assert.rejects(() => backupEncrypted(file, path.join(tmp, 'enc3'), 'scurta'), /cel puțin 12 caractere/);
+  assert.equal(fs.readdirSync(path.join(tmp, 'enc3')).length, 0, 'după eșec nu rămâne copie în clar');
+  assert.ok(!fs.existsSync(path.join(tmp, 'x1.db')));
+  db.close();
+});
+
+test('CLI: --encrypt și --decrypt cu parola din mediu (nu din argumente)', async () => {
+  const { db, file } = makeSource(); db.close();
+  const env = { ...process.env, LIMS_DB_PATH: file, LIMS_BACKUP_PASSPHRASE: 'parola-de-test-lunga' };
+  const script = path.join(__dirname, '..', '..', 'scripts', 'backup-db.js');
+  const e = spawnSync(process.execPath, [script, '--encrypt', path.join(tmp, 'enc4')], { env, encoding: 'utf8' });
+  assert.equal(e.status, 0, e.stderr);
+  const encFile = path.join(tmp, 'enc4', fs.readdirSync(path.join(tmp, 'enc4'))[0]);
+  const d = spawnSync(process.execPath, [script, '--decrypt', encFile, path.join(tmp, 'cli-restored.db')], { env, encoding: 'utf8' });
+  assert.equal(d.status, 0, d.stderr);
+  const bad = spawnSync(process.execPath, [script, '--decrypt', encFile, path.join(tmp, 'cli-bad.db')], { env: { ...env, LIMS_BACKUP_PASSPHRASE: 'alta-parola-lunga-1' }, encoding: 'utf8' });
+  assert.equal(bad.status, 1);
+});

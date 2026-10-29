@@ -33,7 +33,8 @@ function addSample(code, product, { col, limitCol, limit, value, qcStatus = 'acc
   const sets = [limitCol];
   const vals = [limit];
   if (value !== undefined) { sets.push(col); vals.push(value); }
-  db.prepare(`INSERT INTO results (sample_id, ${sets.join(', ')}, qc_status) VALUES (?, ${sets.map(() => '?').join(', ')}, ?)`)
+  // D2 (O1): arhiva beneficiarului arată valori și verdict numai pentru rezultate validate.
+  db.prepare(`INSERT INTO results (sample_id, ${sets.join(', ')}, qc_status, validation_status) VALUES (?, ${sets.map(() => '?').join(', ')}, ?, 'validated')`)
     .run(info.lastInsertRowid, ...vals, qcStatus);
 }
 

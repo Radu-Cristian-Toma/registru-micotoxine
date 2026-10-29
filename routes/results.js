@@ -953,6 +953,11 @@ router.get('/:sampleId/versions', requireRole('owner', 'operator', 'validator', 
 
   // Returnam cea mai recenta versiune prima, ca in interfata.
   withDiffs.reverse();
+  // O1: beneficiarul nu vede istoricul valorilor înainte de validare.
+  if (req.session.user.role === 'owner') {
+    const v = db.prepare('SELECT validation_status AS validationStatus FROM results WHERE sample_id = ?').get(req.params.sampleId);
+    if (!v || v.validationStatus !== 'validated') return res.json({ versions: [] });
+  }
   res.json({ versions: withDiffs });
 });
 

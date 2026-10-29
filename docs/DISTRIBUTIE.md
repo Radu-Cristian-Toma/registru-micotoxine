@@ -1,15 +1,15 @@
-# Distribuție către laboratoare (v1.55.0)
+# Distribuție către laboratoare (v1.55.1)
 
 **Stare:** pilot, nevalidat și neacreditat. Parcurgeți `docs/LISTA_VERIFICARE_LABORATOR.md` și `docs/VALIDARE_PILOT.md` înainte de a folosi aplicația cu date reale. Valorile marcate [de completat] aparțin laboratorului.
 
 **Licență:** AGPL-3.0-or-later (`LICENSE`, `NOTICE`). Dacă modificați programul și îl puneți la dispoziția altor utilizatori printr-o rețea, le oferiți și codul sursă modificat (setați `LIMS_SOURCE_URL`).
 
 ## 1. Ce conține pachetul
-Arhiva `lims-micotoxine-1.55.0.tar.gz` (cu `SHA256SUMS`) conține codul, `Dockerfile`, `docker-compose.yml` (aplicația și proxy HTTPS Caddy), `docker-compose.demo.yml`, documentația și ghidul `docs/Ghid_utilizare_v1.55.0.pdf`. Verificați arhiva: `sha256sum -c SHA256SUMS`.
+Arhiva `lims-micotoxine-1.55.1.tar.gz` (cu `SHA256SUMS`) conține codul, `Dockerfile`, `docker-compose.yml` (aplicația și proxy HTTPS Caddy), `docker-compose.demo.yml`, documentația și ghidul `docs/Ghid_utilizare_v1.55.0.pdf`. Verificați arhiva: `sha256sum -c SHA256SUMS`.
 
 ## 2. Instalare cu Docker (recomandat)
 Cerințe: un server Linux cu Docker Engine și Docker Compose; un nume DNS pentru server (pentru certificat automat) și porturile 80/443 deschise.
-1. `tar xzf lims-micotoxine-1.55.0.tar.gz && cd lims-micotoxine-1.55.0`
+1. `tar xzf lims-micotoxine-1.55.1.tar.gz && cd lims-micotoxine-1.55.1`
 2. `cp docker/env.example .env` și completați `LIMS_DOMAIN` (numele serverului) și `LIMS_ADMIN_EMAIL`; opțional `LIMS_BACKUP_PASSPHRASE` (minimum 12 caractere, păstrată separat).
 3. `docker compose up -d --build`
 4. `docker compose logs lims` — parola temporară a primului administrator apare **o singură dată**.

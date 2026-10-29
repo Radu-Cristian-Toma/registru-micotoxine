@@ -1,8 +1,8 @@
-# Registru Micotoxine — v1.55.0
+# Registru Micotoxine — v1.55.1
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23778986.svg)](https://doi.org/10.5281/zenodo.23778986)
 
-**Cum se citează:** Toma R.C. (2026). *Registru Micotoxine*, v1.55.0 [software]. Zenodo. https://doi.org/10.5281/zenodo.23778986 (vezi `CITATION.cff`).
+**Cum se citează:** Toma R.C. (2026). *Registru Micotoxine* [software]. Zenodo. v1.55.0: https://doi.org/10.5281/zenodo.23778986; DOI-ul v1.55.1 se adaugă după release (vezi `CITATION.cff`).
 
 LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine, în dezvoltare activă către un pilot de laborator.
 
@@ -131,7 +131,7 @@ Lanțul singur nu împiedică un atacator cu acces la fișierul bazei de date s�
 
 ## Documentație
 
-`docs/Ghid_utilizare_v1.55.0.pdf` — ghid de utilizare bilingv (română/engleză), cu pași și capturi de ecran reale pentru fiecare dintre cele patru roluri (beneficiar, operator, validator, administrator), reflectând comportamentul curent al aplicației.
+`docs/Ghid_utilizare_v1.55.1.pdf` — ghid de utilizare bilingv (română/engleză), cu pași și capturi de ecran reale pentru fiecare dintre cele patru roluri (beneficiar, operator, validator, administrator), reflectând comportamentul curent al aplicației.
 
 `docs/DEMO_SCRIPT.md` — scenariu scurt de demonstrație, pe roluri.
 
@@ -147,7 +147,7 @@ Verificarea confirmă structura fișierelor, sincronizarea versiunilor (`package
 
 ## Statut
 
-v1.55.0 adaugă distribuția pentru laboratoare (licență AGPL-3.0, Docker, prima pornire, instanță demo, ghid RO/EN); vezi `docs/RELEASE_NOTES_v1.55.md`.
+v1.55.1 corectează traducerea în engleză (sens, terminologie, mesajele de eroare ale serverului), demo-ul animat și ghidul; vezi `docs/RELEASE_NOTES_v1.55.1.md`. v1.55.0 a adăugat distribuția pentru laboratoare (licență AGPL-3.0, Docker, prima pornire, instanță demo, ghid RO/EN); vezi `docs/RELEASE_NOTES_v1.55.md`.
 
 v1.54.0 încheie etapele de funcții (loturi cu mai multe probe, verificare publică în stări, export JSON), de verdict preliminar (ascuns beneficiarului până la validare) și de securizare; vezi `docs/RELEASE_NOTES_v1.54.md`. Aplicația rămâne **pilot**, fără validare sau acreditare.
 

@@ -3,7 +3,7 @@
 services:
   lims:
     build: .
-    image: lims-micotoxine:1.55.0
+    image: lims-micotoxine:1.55.1
     restart: unless-stopped
     environment:
       LIMS_ADMIN_EMAIL: ${LIMS_ADMIN_EMAIL:-}

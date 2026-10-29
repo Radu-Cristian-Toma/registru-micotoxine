@@ -29,6 +29,7 @@ Interfața este bilingvă (română/engleză), cu comutator de limbă disponibil
 - numerotare de buletin cu unicitate garantată la nivel de bază de date
 - reguli de decizie și declarație de conformitate, atunci când sunt utilizate
 - loturi cu mai multe probe de laborator (smochine; arahide, fructe cu coajă lemnoasă și mirodenii cu particule mari), cu decizie de lot după Reg. (UE) 2023/2782, anexa I, partea II (C.8, D.8): regula „nicio probă nu depășește limita” sau media probelor; lotul se constituie în fila „Laborator” și se îngheață după validarea oricărei probe
+- beneficiarul nu vede valori, verdict, observații, jurnal sau versiuni înainte de validarea probei (mascare pe server)
 - verificare publică a buletinului în stări (autentic / modificat / lipsă / neverificabil), cu amprenta din codul QR tipărit
 - export structurat (JSON) al rezultatului unui buletin emis: valoare cu comparator „<” sub LOQ, incertitudine extinsă (k = 2, 95 %), recuperare, regulă, decizie cu vocabular fix
 - versionarea rezultatelor și a buletinelor

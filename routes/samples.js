@@ -4,6 +4,7 @@ const { attachBulletinLifecycle } = require('../db/bulletin-state');
 const db = require('../db/database');
 const { logEvent } = require('../db/audit');
 const { requireRole } = require('../middleware/auth');
+const { maskForOwner, maskAuditForOwner } = require('../db/owner-view');
 const { DEFAULT_LIMITS, LIMIT_REGULATION_REF, evaluateResult, evaluateArchiveRow, getRuleProfile, availableGroupsForProfile, TEST_GROUP_KEYS } = require('../db/evaluation');
 const { detectIncreasingTrend } = require('../db/trend-analysis');
 
@@ -242,7 +243,7 @@ router.get('/mine', requireRole('owner'), (req, res) => {
     // proprietar - fara nevoie de server de email.
     const currentSignature = `${computedStatus}|${r.validationStatus}`;
     const hasUpdate = ownerSeenState !== null && ownerSeenState !== currentSignature;
-    return { ...rest, requestedTests, status: computedStatus, hasUpdate };
+    return maskForOwner({ ...rest, requestedTests, status: computedStatus, hasUpdate });
   });
 
   res.json({ samples: attachBulletinLifecycle(withStatus) });
@@ -287,7 +288,7 @@ router.get('/archive', requireRole('owner'), (req, res) => {
 
   let rows = db.prepare(query).all(...params);
 
-  let withStatus = rows.map(r => ({ ...r, status: evaluateArchiveRow(r) }));
+  let withStatus = rows.map(r => maskForOwner({ ...r, status: evaluateArchiveRow(r) }));
 
   // Filtrul de status se aplica dupa calculul verdictului, pentru ca statusul
   // nu e o coloana stocata direct in forma finala (e derivat din rezultate+limite).
@@ -317,7 +318,7 @@ router.get('/archive/export', requireRole('owner'), (req, res) => {
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,
            r.limit_afb1 AS limitAfb1, r.limit_afla_sum AS limitAflaSum, r.limit_ota AS limitOta,
            r.limit_m1 AS limitM1, r.limit_don AS limitDon, r.limit_zea AS limitZea, r.limit_fum AS limitFum,
-           r.analysis_date AS analysisDate, r.notes, r.qc_status AS qcStatus
+           r.analysis_date AS analysisDate, r.notes, r.qc_status AS qcStatus, r.validation_status AS validationStatus
     FROM samples s
     LEFT JOIN results r ON r.sample_id = s.id
     WHERE s.owner_id = ?
@@ -340,7 +341,7 @@ router.get('/archive/export', requireRole('owner'), (req, res) => {
   query += ' ORDER BY s.created_at DESC';
 
   let rows = db.prepare(query).all(...params);
-  rows = rows.map(r => ({ ...r, status: evaluateArchiveRow(r) }));
+  rows = rows.map(r => maskForOwner({ ...r, status: evaluateArchiveRow(r) }));
 
   if (status) {
     rows = rows.filter(r => r.status === status);
@@ -466,7 +467,7 @@ router.get('/:id', requireRole('owner', 'admin'), (req, res) => {
     return res.status(403).json({ error: 'Nu ai acces la această probă.' });
   }
 
-  res.json({ sample });
+  res.json({ sample: req.session.user.role === 'owner' ? maskForOwner(sample) : sample });
 });
 
 // Marcheaza proba drept "vazuta" de proprietar la starea ei curenta -
@@ -577,6 +578,10 @@ router.get('/:sampleId/audit', requireRole('owner', 'operator', 'validator', 'ad
     FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
     WHERE a.sample_id = ? ORDER BY a.created_at DESC, a.id DESC
   `).all(req.params.sampleId);
+  if (req.session.user.role === 'owner') {
+    const v = db.prepare("SELECT validation_status AS validationStatus FROM results WHERE sample_id = ?").get(req.params.sampleId);
+    return res.json({ audit: maskAuditForOwner(rows, !!v && v.validationStatus === 'validated') });
+  }
   res.json({ audit: rows });
 });
 

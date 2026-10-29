@@ -19,6 +19,7 @@ const required = [
   'routes/lots.js',
   'db/database.js',
   'db/evaluation.js',
+  'db/owner-view.js',
   'db/lots.js',
   'db/result-export.js',
   'db/session-store.js',

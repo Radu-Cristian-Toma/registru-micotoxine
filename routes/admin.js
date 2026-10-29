@@ -1,6 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const db = require('../db/database');
+require('../db/session-store'); // creează tabela de sesiuni, folosită la închiderea sesiunilor la resetare
 const { logEvent } = require('../db/audit');
 const { requireRole } = require('../middleware/auth');
 
@@ -30,6 +32,27 @@ router.post('/operators', requireRole('admin'), (req, res) => {
 
   logEvent(req.session.user.id, 'account_created', { newUserId: info.lastInsertRowid, email: email.toLowerCase().trim(), role: 'operator' });
   res.json({ id: info.lastInsertRowid, email: email.toLowerCase().trim(), fullName: fullName.trim(), role: 'operator' });
+});
+
+// D3: resetarea parolei unui cont de către administrator. Se generează o parolă temporară, afișată o
+// singură dată; contul trebuie să o schimbe la prima autentificare (middleware/password-gate.js), iar
+// sesiunile lui deschise se închid. Administratorul nu își resetează propriul cont (folosește schimbarea parolei).
+router.post('/users/reset-password', requireRole('admin'), (req, res) => {
+  const email = String((req.body || {}).email || '').toLowerCase().trim();
+  if (!email) return res.status(400).json({ error: 'Introdu adresa de email a contului.' });
+  const user = db.prepare('SELECT id, email, role, full_name AS fullName FROM users WHERE email = ?').get(email);
+  if (!user) return res.status(404).json({ error: 'Nu există un cont cu acest email.' });
+  if (user.id === req.session.user.id) return res.status(400).json({ error: 'Propria parolă se schimbă din butonul „Parola”, nu prin resetare.' });
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let temp = '';
+  for (let i = 0; i < 14; i++) temp += alphabet[crypto.randomInt(alphabet.length)];
+  db.transaction(() => {
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(bcrypt.hashSync(temp, 12), user.id);
+    // Închide sesiunile deschise ale contului (store-ul păstrează JSON-ul sesiunii).
+    db.prepare("DELETE FROM sessions WHERE json_extract(data, '$.user.id') = ?").run(user.id);
+    logEvent(req.session.user.id, 'password_reset_by_admin', { userId: user.id, role: user.role });
+  })();
+  res.json({ ok: true, email: user.email, fullName: user.fullName, role: user.role, temporaryPassword: temp });
 });
 
 router.get('/operators', requireRole('admin'), (req, res) => {

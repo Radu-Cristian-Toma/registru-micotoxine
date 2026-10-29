@@ -75,4 +75,36 @@ function clearAttempts(req) {
   attempts.delete(keyFor(req));
 }
 
-module.exports = { loginRateLimit, recordFailedAttempt, clearAttempts };
+// Etapa D3: blocare pe cont, în plus față de limita pe IP. Un atacator care schimbă adresa IP nu poate
+// încerca la nesfârșit parole pentru același cont: după ACCOUNT_MAX încercări eșuate în fereastră, contul
+// este blocat până la sfârșitul ferestrei, chiar și pentru parola corectă. Se numără și conturile
+// inexistente (răspunsul nu diferă), ca să nu se afle ce conturi există. Compromis asumat: un atacator
+// poate bloca temporar un cont cunoscut; blocarea expiră singură.
+const ACCOUNT_MAX = 10;
+const accountAttempts = new Map(); // email -> { count, windowStart }
+const accountKey = (email) => String(email || '').toLowerCase().trim();
+
+function accountLocked(email) {
+  const e = accountAttempts.get(accountKey(email));
+  if (!e) return false;
+  if (Date.now() - e.windowStart > WINDOW_MS) { accountAttempts.delete(accountKey(email)); return false; }
+  return e.count >= ACCOUNT_MAX;
+}
+// Întoarce true exact când această încercare atinge pragul (blocarea tocmai începe).
+function recordFailedAccount(email) {
+  const key = accountKey(email); const now = Date.now();
+  const e = accountAttempts.get(key);
+  if (!e || now - e.windowStart > WINDOW_MS) { accountAttempts.set(key, { count: 1, windowStart: now }); return false; }
+  e.count += 1;
+  return e.count === ACCOUNT_MAX;
+}
+function clearAccount(email) { accountAttempts.delete(accountKey(email)); }
+function resetAllForTests() { attempts.clear(); accountAttempts.clear(); }
+
+const pruneAccounts = setInterval(() => {
+  const now = Date.now();
+  for (const [k, e] of accountAttempts) if (now - e.windowStart > WINDOW_MS) accountAttempts.delete(k);
+}, 5 * 60 * 1000);
+if (pruneAccounts.unref) pruneAccounts.unref();
+
+module.exports = { loginRateLimit, recordFailedAttempt, clearAttempts, accountLocked, recordFailedAccount, clearAccount, resetAllForTests, ACCOUNT_MAX, WINDOW_MS };

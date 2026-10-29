@@ -339,6 +339,12 @@ db.exec(`
 
 const sampleColumns = db.prepare(`PRAGMA table_info(samples)`).all().map(c => c.name);
 
+// Etapa D3: parolă temporară setată de administrator; cont blocat până la schimbarea ei.
+{
+  const userColumns = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
+  if (!userColumns.includes('must_change_password')) db.exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`);
+}
+
 // Etapa D1 (lot cu mai multe probe de laborator, Reg. (UE) 2023/2782 anexa I partea II, C.8 și D.8):
 // o probă din aplicație rămâne o singură probă de laborator; un lot grupează probele aceluiași
 // beneficiar pentru care decizia se ia pe lot (judgeLot în public/decision-core.js).

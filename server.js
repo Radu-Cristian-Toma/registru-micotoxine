@@ -21,10 +21,21 @@ const labRoutes = require('./routes/lab');
 const lotsRoutes = require('./routes/lots');
 const SqliteSessionStore = require('./db/session-store');
 const { ensureCsrfToken, requireCsrf } = require('./middleware/csrf');
+const { requirePasswordChange } = require('./middleware/password-gate');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const { HOST } = require('./config');
+const { HOST, DEV_SESSION_SECRET, checkProductionConfig, trustProxySetting } = require('./config');
+
+// Etapa D3: în producție aplicația refuză să pornească cu o configurare nesigură.
+const prodErrors = checkProductionConfig();
+if (prodErrors.length) {
+  console.error('Configurare nesigură pentru producție:\n - ' + prodErrors.join('\n - '));
+  process.exit(1);
+}
+const IS_PROD = process.env.NODE_ENV === 'production';
+const trustProxy = trustProxySetting();
+if (trustProxy) app.set('trust proxy', trustProxy);
 
 // Security baseline for this stage of the project. These headers do not
 // replace a production reverse proxy/WAF/security policy, but reduce
@@ -35,6 +46,10 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // Directive CSP care nu cer modificarea scripturilor existente (cele pentru script/style cer refactorizare separată).
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'");
+  if (IS_PROD) res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
 
@@ -50,7 +65,7 @@ if (!process.env.SESSION_SECRET) {
 app.use(express.json({ limit: '8mb' }));
 app.use(session({
   store: new SqliteSessionStore(),
-  secret: process.env.SESSION_SECRET || 'dev-secret-schimba-in-productie',
+  secret: process.env.SESSION_SECRET || DEV_SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -63,6 +78,7 @@ app.use(session({
 
 app.use(ensureCsrfToken);
 app.use('/api', requireCsrf);
+app.use('/api', requirePasswordChange);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

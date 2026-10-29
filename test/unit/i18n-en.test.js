@@ -11,6 +11,7 @@ const i18nSrc = fs.readFileSync(path.join(root, 'public', 'i18n.js'), 'utf8');
 const ctx = { window: {}, document: {}, localStorage: { getItem: () => null, setItem() {} }, console };
 vm.createContext(ctx);
 vm.runInContext(i18nSrc + ';this.TR = TRANSLATIONS; this.limitSourceEn = limitSourceEn; this.VAL = VALIDATION_TESTS_EN; this.valTestText = valTestText; this.setLang = setLang;', ctx);
+vm.runInContext(fs.readFileSync(path.join(root, 'public', 'server-errors-en.js'), 'utf8') + ';this.translateServerError = translateServerError; this.SERVER_ERRORS_EN = SERVER_ERRORS_EN;', ctx);
 
 function pairs() {
   const rows = [];
@@ -82,4 +83,45 @@ test('matricea de validare VAL-01…15 are text EN pentru toate testele', () => 
   assert.equal(ctx.valTestText({ code: 'VAL-99', title: 'x', area: 'Acces', expected: 'y' }).area, 'Access');
   ctx.setLang('ro');
   assert.equal(ctx.valTestText({ code: 'VAL-01', title: 'T', area: 'Acces', expected: 'E' }).title, 'T');
+});
+
+// Mesajele de eroare ale serverului (în română) au traducere pentru interfața în engleză.
+function serverErrorStrings() {
+  const out = new Set();
+  const files = ['routes', 'middleware'].flatMap(d => fs.readdirSync(path.join(root, d)).filter(f => f.endsWith('.js')).map(f => path.join(root, d, f)));
+  files.push(path.join(root, 'server.js'));
+  for (const f of files) {
+    const src = fs.readFileSync(f, 'utf8');
+    for (const m of src.matchAll(/error:\s*(?:'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`|"((?:[^"\\]|\\.)*)")/g)) {
+      const txt = (m[1] ?? m[2] ?? m[3]).replace(/\\'/g, "'");
+      let i = 0;
+      out.add(txt.replace(/\$\{[^}]*\}/g, () => `{${i++}}`));
+    }
+  }
+  return [...out];
+}
+
+test('fiecare mesaj de eroare din rute are traducere în engleză, fără diacritice', () => {
+  const have = new Map(ctx.SERVER_ERRORS_EN.map(([ro, en]) => [ro, en]));
+  const msgs = serverErrorStrings();
+  assert.ok(msgs.length >= 140, `prea puține mesaje extrase: ${msgs.length}`);
+  const missing = msgs.filter(m => !have.has(m));
+  assert.deepEqual(missing, [], 'mesaje fără traducere în public/server-errors-en.js');
+  for (const [ro, en] of have) {
+    assert.ok(en && !DIACRITICS.test(en), `EN invalid: ${en}`);
+    assert.deepEqual((ro.match(/\{\d+\}/g) || []).sort(), (en.match(/\{\d+\}/g) || []).sort(), `locuri rezervate diferite: ${ro}`);
+    assert.doesNotMatch(en, /\bclient|bulletin|beneficiar/i, en);
+  }
+});
+
+test('translateServerError: exact, șablon cu valori, necunoscut și limba română', () => {
+  ctx.setLang('en');
+  assert.equal(ctx.translateServerError('Email sau parolă incorectă.'), 'Incorrect email or password.');
+  assert.equal(ctx.translateServerError('Prea multe încercări de autentificare. Încearcă din nou peste 15 minute.'), 'Too many sign-in attempts. Try again in 15 minutes.');
+  assert.equal(ctx.translateServerError('Proba MYC-2026-0007 este anulată.'), 'Sample MYC-2026-0007 is cancelled.');
+  assert.equal(ctx.translateServerError('Valoare invalidă pentru afla.loq.'), 'Invalid value for afla.loq.');
+  assert.equal(ctx.translateServerError('Un text nou, încă netradus.'), 'Un text nou, încă netradus.');
+  assert.equal(ctx.translateServerError(undefined), undefined);
+  ctx.setLang('ro');
+  assert.equal(ctx.translateServerError('Email sau parolă incorectă.'), 'Email sau parolă incorectă.');
 });

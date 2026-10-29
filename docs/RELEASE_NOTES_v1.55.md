@@ -18,4 +18,5 @@
 - **Terminologie unitară în engleză:** „customer” (nu client / owner / beneficiary), „test report” (nu „bulletin”), „compliant / non-compliant” pentru verdictul față de limită, „Mycotoxin Register”, „Fusarium”, ortografie britanică.
 - **Texte din server tradise în interfață:** sursele limitelor (inclusiv versiunea consolidată a regulamentului) și matricea de validare VAL-01…15 apar în engleză când interfața este în engleză; pe buletin rămân bilingve.
 - **Test automat** (`test/unit/i18n-en.test.js`): acoperire EN, fără diacritice românești în valorile EN, terminologie unitară, sursele limitelor traduse.
-- **Neschimbat:** mesajele de eroare ale serverului (aprox. 156) rămân în română; urmează într-o etapă separată. Parolele, limitele și regula de decizie nu s-au modificat. 188 de teste trecute; 45/45 verificări în browser.
+- **Mesajele de eroare ale serverului** (143 de texte din `routes/` și `middleware/`) se traduc în interfața EN prin `public/server-errors-en.js` (potrivire exactă sau pe șablon, pentru mesajele cu valori); textele necunoscute rămân neschimbate. Un test automat cere traducere pentru fiecare mesaj nou.
+- **Neschimbat:** Parolele, limitele și regula de decizie nu s-au modificat. 188 de teste trecute; 45/45 verificări în browser.

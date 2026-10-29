@@ -7,7 +7,7 @@ async function api(path, options = {}) {
     ...options,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || t('common.genericError'));
+  if (!res.ok) throw new Error(translateServerError(data.error) || t('common.genericError'));
   return data;
 }
 

@@ -1627,3 +1627,10 @@ table.contaminants th .bulletin-en {
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 .lab-card { margin-bottom: 28px; }
 .lab-card .checkbox-row { display: flex; gap: 8px; align-items: center; }
+
+/* O3: fragmentele bilingve din rezumatul deciziei și al performanței rămân pe același rând la tipărire */
+.bulletin-en-inline { font-size: 0.88em; font-style: italic; color: var(--ink-soft); }
+.perf-summary .perf-line { display: inline-block; max-width: 100%; }
+@media print {
+  .perf-summary, .perf-summary .perf-line { break-inside: avoid; page-break-inside: avoid; }
+}

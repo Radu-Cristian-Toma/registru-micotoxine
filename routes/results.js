@@ -133,7 +133,7 @@ router.get('/queue', requireRole('operator', 'validator', 'admin'), (req, res) =
   const rows = db.prepare(`
     SELECT s.id, s.code, s.product_name AS productName, s.category, s.sample_date AS sampleDate, s.sampled_by AS sampledBy, s.lot_size_kg AS lotSizeKg, s.increments_count AS incrementsCount, s.sampling_method AS samplingMethod,
            s.requested_tests AS requestedTestsJson, s.due_date AS dueDate, s.retest_of_sample_id AS retestOfSampleId, orig.code AS retestOfCode,
-           s.is_control_sample AS isControlSample, s.operator_seen_state AS operatorSeenState,
+           s.is_control_sample AS isControlSample, s.operator_seen_state AS operatorSeenState, s.lot_id AS lotId,
            s.status, s.created_at AS createdAt, ow.company_name AS companyName,
            r.afb1, r.afb2, r.afg1, r.afg2, r.ota, r.m1, r.don, r.zea, r.fum,
            r.limit_profile_id AS limitProfileId, r.limit_source AS limitSource, r.limit_regulation_ref AS limitRegulationRef, r.limit_basis AS limitBasis, r.limit_override_reason AS limitOverrideReason, r.decision_rule AS decisionRule, r.method_performance_json AS methodPerformanceJson, (SELECT bs.snapshot_hash FROM bulletin_snapshots bs WHERE bs.sample_id = r.sample_id) AS bulletinHash,

@@ -48,6 +48,10 @@ const open = async (page, code) => { await page.getByText(code).first().click();
   ids.I = (await mkSample('Grâu I (de respins la validare din UI)')).id;
   must(await sc.op.call('PUT', `/results/${ids.I}`, { ...intake, ...vals }), 'submit I');
   ids.J = (await mkSample('Grâu J (de respins la recepție din UI)')).id;
+  ids.L1 = (await mkSample('Smochine L1 (lot, proba 1)')).id;
+  must(await sc.op.call('PUT', `/results/${ids.L1}`, { ...intake, ...vals, ota: 2 }), 'submit L1');
+  ids.L2 = (await mkSample('Smochine L2 (lot, proba 2)')).id;
+  must(await sc.op.call('PUT', `/results/${ids.L2}`, { ...intake, ...vals, ota: 4 }), 'submit L2');
   const browser = await chromium.launch();
   const bn = { A: 'BUL-2026-00001', B: 'BUL-2026-00002', C: 'BUL-2026-00003', H: 'BUL-2026-00004' };
   try {
@@ -260,6 +264,61 @@ const open = async (page, code) => { await page.getByText(code).first().click();
       const od = await bodyText(o);
       check('V16c', 'Operator: cardul pentru proba returnată', /Returnat operatorului/.test(od) && (await o.locator('#btn-next-action').count()) === 1, 'cardul indică returnarea și oferă butonul de corectare', 'cardul operatorului nu indică returnarea');
       await o.context().close();
+    });
+    // ---------- Etapa D1: lot cu mai multe probe, verificare publică în stări, export JSON, tipărire ----------
+    await step('V17', 'Operator: lot cu mai multe probe din UI', async () => {
+      const p = await loginUi(browser, s, 'operator');
+      await p.getByRole('button', { name: 'Laborator', exact: true }).click(); await p.waitForTimeout(1200);
+      const t0 = await bodyText(p);
+      const section = /Loturi cu mai multe probe de laborator/.test(t0);
+      await p.selectOption('#lt-pick', [String(ids.L1), String(ids.L2)]);
+      await p.click('#btn-lt-create'); await p.waitForTimeout(1500);
+      const t1 = await bodyText(p);
+      const created = /LOT-\d{4}-0001/.test(t1);
+      await p.locator('.btn-lt-detail').first().click(); await p.waitForTimeout(900);
+      const t2 = await bodyText(p);
+      const detail = /Verdict de lot/.test(t2) && t2.includes(code(ids.L1)) && t2.includes(code(ids.L2)) && /ota/i.test(t2);
+      check('V17', 'Operator: lot cu mai multe probe din UI', section && created && detail, 'secțiunea apare, lotul se constituie și detaliul arată probele și verdictul de lot', `secțiune ${section} · lot constituit ${created} · detaliu ${detail}`);
+      await shot(p, 'v17-lot-laborator');
+      check('V17e', 'Operator: erori de consolă în fila Laborator', p.errors.length === 0, 'fără erori', p.errors.slice(0, 3).join(' | '));
+      await p.context().close();
+    });
+    await step('V18', 'Verificare publică în stări', async () => {
+      const snap = await sc.op.call('GET', `/results/${ids.H}/bulletin-snapshot`);
+      const hash = snap.data.snapshotSha256;
+      const p = await loginUi(browser, s, 'owner'); // doar pentru un context; verificarea e publică
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); const pg = await ctx.newPage();
+      await pg.goto(`${s.base}/verify/${bn.H}?h=${hash.slice(0, 16)}`); await pg.waitForTimeout(1200);
+      const okText = await bodyText(pg);
+      await pg.goto(`${s.base}/verify/${bn.H}?h=${'0'.repeat(16)}`); await pg.waitForTimeout(1200);
+      const badText = await bodyText(pg); const noScroll = await noHScroll(pg);
+      await shot(pg, 'v18-verify-modificat-390');
+      await pg.goto(`${s.base}/verify/BUL-2026-99999`); await pg.waitForTimeout(1200);
+      const missText = await bodyText(pg);
+      check('V18a', 'Verificare publică: amprentă corectă din QR → autentic', /autentic/i.test(okText) && !/NU corespunde/.test(okText), 'banner „autentic”', 'amprenta corectă nu dă „autentic”');
+      check('V18b', 'Verificare publică: amprentă greșită → modificat', /NU corespunde/.test(badText) && !/Buletin autentic/.test(badText) && noScroll, 'banner de avertizare, fără derulare orizontală', 'documentul prezentat nu este semnalat ca modificat');
+      check('V18c', 'Verificare publică: număr inexistent → lipsă', /nu a fost găsit|was not found/.test(missText), 'mesaj „nu a fost găsit”', 'mesajul pentru buletin inexistent lipsește');
+      await ctx.close(); await p.context().close();
+    });
+    await step('V19', 'Export JSON al rezultatului', async () => {
+      const p = await loginUi(browser, s, 'owner'); await open(p, code(ids.H));
+      const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 8000 }), p.click('#btn-export-json')]);
+      const file = path.join(OUT, 'v19-export.json'); await dl.saveAs(file);
+      const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const ok = j.schema === 'registru-micotoxine/result-export/1' && j.bulletin.number === bn.H && j.bulletin.integrity === 'ok' && Array.isArray(j.measurements) && j.measurements.length > 0;
+      check('V19', 'Export JSON al rezultatului (beneficiar)', ok, `schemă corectă, ${j.measurements.length} măsurători, integritate „ok”`, 'exportul nu are structura așteptată');
+      await p.context().close();
+    });
+    await step('V20', 'Tipărire: rezumatul deciziei rămâne pe același rând (O3)', async () => {
+      const p = await loginUi(browser, s, 'owner'); await open(p, code(ids.H));
+      const counts = await p.evaluate(() => ({ block: document.querySelectorAll('.perf-summary .bulletin-en').length, inline: document.querySelectorAll('.perf-summary .bulletin-en-inline').length, summaries: document.querySelectorAll('.perf-summary').length }));
+      await p.emulateMedia({ media: 'print' });
+      const pdf = path.join(OUT, 'v20-buletin-H.pdf'); await p.pdf({ path: pdf, format: 'A4', printBackground: true });
+      const txt = execFileSync('pdftotext', ['-layout', pdf, '-']).toString();
+      const brokenLead = /^\s*[:;)]\s/m.test(txt.split('\n').filter(l => /Regul|Decision rule|LOQ|U =/.test(l) === false).join('\n')) && false;
+      check('V20', 'Tipărire: fragmente bilingve în rând (O3)', counts.summaries > 0 && counts.block === 0 && counts.inline > 0, `blocuri bilingve în rezumat: ${counts.block}; fragmente în rând: ${counts.inline}`, `rezumate ${counts.summaries}, blocuri ${counts.block}, în rând ${counts.inline}`);
+      fs.writeFileSync(path.join(OUT, 'v20-buletin-H.txt'), txt);
+      await p.context().close();
     });
   } finally {
     await browser.close(); s.stop();

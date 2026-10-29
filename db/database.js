@@ -338,6 +338,23 @@ db.exec(`
 `);
 
 const sampleColumns = db.prepare(`PRAGMA table_info(samples)`).all().map(c => c.name);
+
+// Etapa D1 (lot cu mai multe probe de laborator, Reg. (UE) 2023/2782 anexa I partea II, C.8 și D.8):
+// o probă din aplicație rămâne o singură probă de laborator; un lot grupează probele aceluiași
+// beneficiar pentru care decizia se ia pe lot (judgeLot în public/decision-core.js).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sample_lots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    product_name TEXT,
+    lot_mode TEXT NOT NULL CHECK (lot_mode IN ('none_exceeds', 'average')),
+    note TEXT,
+    created_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  );
+`);
+if (!sampleColumns.includes('lot_id')) db.exec(`ALTER TABLE samples ADD COLUMN lot_id INTEGER REFERENCES sample_lots(id)`);
 if (!sampleColumns.includes('haccp_intended_use')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_intended_use TEXT`);
 if (!sampleColumns.includes('haccp_hazard')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_hazard TEXT`);
 if (!sampleColumns.includes('haccp_likelihood')) db.exec(`ALTER TABLE samples ADD COLUMN haccp_likelihood INTEGER`);

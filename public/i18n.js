@@ -1288,6 +1288,23 @@ function bt(path) {
   return `${primar}<span class="bulletin-en">${secundar}</span>`;
 }
 
+// Varianta „în rând” a lui bt(): pentru fragmente care intră într-o propoziție (rezumatul regulii
+// de decizie și al performanței metodei de pe buletin). bt() pune engleza pe rând separat
+// (display: block), ceea ce rupe propoziția la tipărire; aici engleza urmează în paranteză, pe același rând.
+function bti(path) {
+  const parts = path.split('.');
+  let node = TRANSLATIONS;
+  for (const p of parts) {
+    node = node && node[p];
+    if (!node) break;
+  }
+  if (!node || typeof node.ro === 'undefined') return path;
+  if (!node.en || node.en === node.ro) return node.ro;
+  const primar = currentLang === 'en' ? node.en : node.ro;
+  const secundar = currentLang === 'en' ? node.ro : node.en;
+  return `${primar}<span class="bulletin-en-inline"> (${secundar})</span>`;
+}
+
 // Traduce bilingv o eticheta de categorie de produs generata pe server
 // (vezi db/evaluation.js). Daca eticheta romaneasca nu se potriveste exact
 // cu una din harta (ex: categorie noua adaugata ulterior, netradusa inca),

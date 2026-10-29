@@ -8,7 +8,9 @@
 //    pentru grupul respectiv (performanță.corrected = true) și există o
 //    recuperare validă; altfel rezultatul rămâne necorectat;
 //  - regula de decizie: „simple” (valoare > limită) sau „reg_2782_u”
-//    (valoarea efectivă minus incertitudinea extinsă > limită).
+//    (valoarea efectivă minus incertitudinea extinsă > limită);
+//  - regula de lot pe mai multe probe de laborator: judgeLot() (nu este încă legată
+//    de baza de date: o probă din aplicație este o singură probă de laborator).
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.DecisionCore = factory();
@@ -80,5 +82,30 @@
     };
   }
 
-  return { DECISION_RULES, PERFORMANCE_GROUPS, ANALYTE_GROUP, groupPerformance, effectiveValue, aflatoxinSum, judge, assess };
+  // Reguli de lot cu mai multe probe de laborator, conform Reg. (UE) 2023/2782,
+  // anexa I, partea II (verificat pe textul consolidat din 24.03.2024):
+  //  - 'none_exceeds' (smochine, C.8; arahide/fructe cu coajă/mirodenii destinate
+  //    consumatorului final sau ca ingredient, D.8): acceptare dacă nicio probă nu
+  //    depășește nivelul maxim; respingere dacă una sau mai multe depășesc
+  //    „dincolo de orice îndoială rezonabilă” (valoarea corectată minus U > limită);
+  //  - 'average' (arahide/fructe cu coajă supuse sortării, D.8): decizia se ia pe
+  //    media probelor de laborator (media valorilor efective, apoi regula de decizie).
+  // Pentru o singură probă de laborator se folosește judge() direct.
+  // Intrare: lista valorilor efective (după corecția pentru recuperare, dacă este
+  // cazul); valorile lipsă se ignoră. Ieșire: același vocabular ca judge(), sau null.
+  const LOT_MODES = ['none_exceeds', 'average'];
+  function judgeLot(effectives, limit, rule, uRelPct, mode) {
+    if (LOT_MODES.indexOf(mode) === -1) throw new Error('mod de lot necunoscut: ' + mode);
+    const vals = (effectives || []).filter(v => v !== null && v !== undefined && Number.isFinite(Number(v))).map(Number);
+    if (!vals.length || limit === null || limit === undefined) return null;
+    if (mode === 'average') {
+      return judge(vals.reduce((a, b) => a + b, 0) / vals.length, limit, rule, uRelPct);
+    }
+    const verdicts = vals.map(v => judge(v, limit, rule, uRelPct));
+    if (verdicts.includes('non_conform')) return 'non_conform';
+    if (verdicts.includes('within_uncertainty')) return 'within_uncertainty';
+    return 'conform';
+  }
+
+  return { DECISION_RULES, PERFORMANCE_GROUPS, ANALYTE_GROUP, LOT_MODES, groupPerformance, effectiveValue, aflatoxinSum, judge, judgeLot, assess };
 });

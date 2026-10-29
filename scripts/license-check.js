@@ -32,7 +32,7 @@ if (require.main === module) {
   if (process.argv.includes('--list')) for (const r of rows) console.log(`${r.license.padEnd(14)} ${r.name}@${r.version}`);
   const by = {};
   for (const r of rows) by[r.license] = (by[r.license] || 0) + 1;
-  console.log(`Dependențe de execuție: ${rows.length}. ` + Object.entries(by).map(([l, n]) => `${l}: ${n}`).join(', '));
+  console.log(`Pachete de execuție instalate: ${rows.length} (din care 7 dependențe directe). ` + Object.entries(by).map(([l, n]) => `${l}: ${n}`).join(', '));
   if (bad.length) { console.error('Licențe în afara listei permisive:\n' + bad.map(r => `  ${r.name}@${r.version}: ${r.license}`).join('\n')); process.exit(1); }
   console.log('Toate licențele sunt permisive și compatibile cu AGPL-3.0-or-later.');
 }

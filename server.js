@@ -110,7 +110,8 @@ app.listen(PORT, HOST, () => {
   const os = require('os');
   console.log(`Server pornit pe http://${HOST}:${PORT}`);
 
-  if (HOST === '0.0.0.0' || HOST === '::') {
+  // În producție, în spatele proxy-ului HTTPS (LIMS_TRUST_PROXY), ascultarea pe toate interfețele este configurarea prevăzută.
+  if ((HOST === '0.0.0.0' || HOST === '::') && !(IS_PROD && trustProxy)) {
     console.warn('ATENȚIE: serverul ascultă pe toate interfețele de rețea, iar aplicația folosește parole simple de test.');
     const interfaces = os.networkInterfaces();
     const lanAddresses = [];

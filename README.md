@@ -1,4 +1,4 @@
-# Registru Micotoxine — v1.54.0
+# Registru Micotoxine — v1.55.0
 
 LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine, în dezvoltare activă către un pilot de laborator.
 

@@ -50,9 +50,11 @@ async function backupDatabase(sourcePath, destDir) {
 
   const check = verifyDatabase(destPath);
   if (!check.ok) {
-    fs.unlinkSync(destPath);
+    removeWithSidecars(destPath);
     throw new Error('Copia nu a trecut verificarea de integritate și a fost ștearsă.');
   }
+  // Verificarea deschide copia (mod WAL) și poate lăsa fișiere -wal/-shm lângă ea; o copie are un singur fișier.
+  for (const f of [destPath + '-wal', destPath + '-shm', destPath + '-journal']) { try { fs.unlinkSync(f); } catch (_) { /* inexistent */ } }
   return { destPath, bytes: fs.statSync(destPath).size, check };
 }
 

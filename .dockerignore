@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+.env
+db/lims.db*
+backup
+digest
+dist
+docs
+test
+acceptanta-final9
+scripts/browser-verify
+*.log
+*.pdf

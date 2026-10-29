@@ -1,0 +1,23 @@
+Registru Micotoxine (LIMS) — USAMV București / METROFOOD
+Copyright (C) 2026 [de completat: titularul drepturilor de autor]
+
+Acest program este software liber: poate fi redistribuit și/sau modificat în condițiile
+GNU Affero General Public License, versiunea 3 a licenței sau (la alegere) orice versiune
+ulterioară, publicată de Free Software Foundation. Textul complet se află în fișierul LICENSE.
+
+Programul este distribuit în speranța că va fi util, DAR FĂRĂ NICIO GARANȚIE; inclusiv fără
+garanția implicită de COMERCIALIZARE sau de POTRIVIRE PENTRU UN ANUMIT SCOP. Programul nu înlocuiește
+validarea, acreditarea și deciziile responsabilului laboratorului (vezi README și docs/VERIFICARE_REGLEMENTARA.md).
+
+Art. 13 AGPL-3.0: dacă modificați programul și îl puneți la dispoziția utilizatorilor printr-o rețea,
+trebuie să le oferiți și codul sursă al versiunii modificate. Variabila de mediu LIMS_SOURCE_URL
+(vezi docker/env.example) afișează adresa acestuia în subsolul aplicației.
+
+Componente terţe (dependențe de execuție, verificate cu `npm run license-check`):
+toate sunt sub licențe permisive (MIT, ISC, BSD-2-Clause, BSD-3-Clause), compatibile cu AGPL-3.0-or-later.
+Direct utilizate: better-sqlite3, bcryptjs, express, express-session, dotenv, qrcode, bwip-js (toate MIT,
+cu excepția dotenv, BSD-2-Clause). Textele licențelor lor se află în node_modules/<pachet>/LICENSE.
+În imaginea Docker: Node.js (licență MIT) și Caddy (Apache-2.0), ca imagini separate.
+
+Fonturile IBM Plex sunt încărcate de browser de la Google Fonts (licență SIL Open Font License 1.1);
+pentru instalări fără acces la internet, aplicația folosește fonturile sistemului.

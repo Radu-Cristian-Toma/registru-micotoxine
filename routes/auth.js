@@ -112,6 +112,16 @@ router.post('/logout', (req, res) => {
   });
 });
 
+// Etapa E: informații despre instanță, afișate în subsolul aplicației (licență, cod sursă) și bannerul DEMO.
+function instanceInfo() {
+  return {
+    version: require('../package.json').version,
+    license: 'AGPL-3.0-or-later',
+    sourceUrl: (process.env.LIMS_SOURCE_URL || '').trim() || null,
+    demo: require('../config').isDemo()
+  };
+}
+
 router.get('/me', (req, res) => {
   const role = req.session.user?.role || null;
   const permissions = {
@@ -124,7 +134,7 @@ router.get('/me', (req, res) => {
     systemValidation: role === 'admin',
     qualityAdministration: role === 'admin'
   };
-  res.json({ user: req.session.user || null, permissions, csrfToken: req.session.csrfToken });
+  res.json({ user: req.session.user || null, permissions, csrfToken: req.session.csrfToken, instance: instanceInfo() });
 });
 
 // Genereaza un cod QR care duce la pagina de autentificare a aplicatiei,

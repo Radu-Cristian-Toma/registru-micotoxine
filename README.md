@@ -1,4 +1,4 @@
-# Registru Micotoxine — v1.54.0
+# Registru Micotoxine — v1.55.0
 
 LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine, în dezvoltare activă către un pilot de laborator.
 
@@ -79,6 +79,10 @@ Pentru integritatea datelor, proiectarea urmărește principiile ALCOA+ ca gril�
 
 Limitele legale pentru micotoxine sunt corelate cu Reg. (UE) 2023/915 (inclusiv actualizările ulterioare prin regulamentele de modificare — vezi sursele citate direct în `db/evaluation.js`). Aceste limite se modifică periodic; înainte de folosirea platformei pentru decizii reale de conformitate, ele trebuie re-verificate pe versiunea consolidată curentă de pe EUR-Lex, nu doar preluate din acest fișier ca sursă finală.
 
+## Instalare pentru laborator
+
+Pachet Docker cu proxy HTTPS și instanță de demonstrație: `docs/DISTRIBUTIE.md`. Licență: AGPL-3.0-or-later (`LICENSE`).
+
 ## Pornire locală
 
 1. `npm install`
@@ -123,7 +127,7 @@ Lanțul singur nu împiedică un atacator cu acces la fișierul bazei de date s�
 
 ## Documentație
 
-`docs/Ghid_utilizare_v1.53.3.pdf` — ghid de utilizare bilingv (română/engleză), cu pași și capturi de ecran reale pentru fiecare dintre cele patru roluri (beneficiar, operator, validator, administrator), reflectând comportamentul curent al aplicației.
+`docs/Ghid_utilizare_v1.55.0.pdf` — ghid de utilizare bilingv (română/engleză), cu pași și capturi de ecran reale pentru fiecare dintre cele patru roluri (beneficiar, operator, validator, administrator), reflectând comportamentul curent al aplicației.
 
 `docs/DEMO_SCRIPT.md` — scenariu scurt de demonstrație, pe roluri.
 
@@ -138,6 +142,8 @@ Rulați:
 Verificarea confirmă structura fișierelor, sincronizarea versiunilor (`package.json`/`package-lock.json`/README) și sintaxa JavaScript.
 
 ## Statut
+
+v1.55.0 adaugă distribuția pentru laboratoare (licență AGPL-3.0, Docker, prima pornire, instanță demo, ghid RO/EN); vezi `docs/RELEASE_NOTES_v1.55.md`.
 
 v1.54.0 încheie etapele de funcții (loturi cu mai multe probe, verificare publică în stări, export JSON), de verdict preliminar (ascuns beneficiarului până la validare) și de securizare; vezi `docs/RELEASE_NOTES_v1.54.md`. Aplicația rămâne **pilot**, fără validare sau acreditare.
 

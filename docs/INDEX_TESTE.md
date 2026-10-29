@@ -1,6 +1,6 @@
 # Index al testelor automate
 
-**Total: 174 teste în 21 fișiere; 174 trecute, 0 eșuate.**
+**Total: 183 teste în 22 fișiere; 183 trecute, 0 eșuate.**
 
 Generat de `node scripts/list-tests.js --write` (rulează testele); nu se editează manual. Fiecare titlu este un test din `test/unit/*.test.js`. **Testele nu înlocuiesc protocolul de validare al laboratorului** (vezi `docs/VALIDARE_PILOT.md`); sunt probă de sprijin pentru calcul, decizie, integritate, acces și flux.
 
@@ -127,6 +127,18 @@ Generat de `node scripts/list-tests.js --write` (rulează testele); nu se editea
 - ✓ rută: performanța metodei se validează și se salvează; valori invalide → 400
 - ✓ rută: schimbarea regulii de decizie cere motiv; cu motiv schimbă verdictul și se jurnalizează
 - ✓ rută: instantaneul buletinului păstrează regula și detaliul de decizie
+
+## distribution.test.js (9)
+
+- ✓ parola temporară: lungime, alfabet fără caractere ambigue, valori diferite
+- ✓ primul administrator: creat cu parolă temporară și schimbare obligatorie; a doua rulare nu face nimic
+- ✓ primul administrator: e-mail invalid sau ocupat de un cont non-admin este refuzat
+- ✓ .env: creat din șablon cu SESSION_SECRET generat, fără a rescrie un secret existent; permisiuni restrânse
+- ✓ fișier de secret: creat o dată, apoi păstrat
+- ✓ LIMS_DEMO este refuzat în producție și acceptat în dezvoltare
+- ✓ demo-seed refuză fără LIMS_DEMO=1 și în producție
+- ✓ licențele dependențelor de execuție sunt permisive (compatibile AGPL-3.0-or-later)
+- ✓ LICENSE conține AGPL-3.0 integral, iar package.json declară aceeași licență
 
 ## hash-chain.test.js (14)
 

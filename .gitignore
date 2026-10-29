@@ -6,3 +6,4 @@ db/lims.db-wal
 *.log
 backup/
 digest/
+dist/

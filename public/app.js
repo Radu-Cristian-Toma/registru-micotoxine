@@ -596,13 +596,32 @@ const app = document.getElementById('app');
 // ---------- Boot ----------
 async function boot() {
   try {
-    const { user, csrfToken: token } = await api('/auth/me');
+    const { user, csrfToken: token, instance } = await api('/auth/me');
     currentUser = user;
     if (token) csrfToken = token;
+    renderInstanceBar(instance);
   } catch (e) {
     currentUser = null;
   }
   render();
+}
+
+// Etapa E: bannerul DEMO (instanță cu date inventate) și subsolul cu licența AGPL-3.0 (art. 13: acces la sursă).
+function renderInstanceBar(instance) {
+  if (!instance || document.getElementById('instance-footer')) return;
+  if (instance.demo) {
+    const banner = document.createElement('div');
+    banner.id = 'demo-banner';
+    banner.textContent = 'DEMO — date inventate, fără valoare analitică sau legală · DEMO — invented data, no analytical or legal value';
+    document.body.prepend(banner);
+  }
+  const footer = document.createElement('footer');
+  footer.id = 'instance-footer';
+  const src = instance.sourceUrl
+    ? `<a href="${encodeURI(instance.sourceUrl)}" target="_blank" rel="noopener">cod sursă / source code</a>`
+    : 'cod sursă în pachetul de instalare / source code in the installation package';
+  footer.innerHTML = `Registru Micotoxine v${instance.version} · ${instance.license} · ${src}`;
+  document.body.appendChild(footer);
 }
 
 function render() {

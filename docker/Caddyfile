@@ -1,0 +1,7 @@
+# Proxy HTTPS în fața aplicației. LIMS_DOMAIN: numele DNS al serverului (implicit „localhost”).
+#  - nume public cu DNS și porturile 80/443 accesibile: certificat Let's Encrypt automat;
+#  - „localhost” sau nume intern: certificat propriu (Caddy local CA) — browserul va cere încrederea în el.
+{$LIMS_DOMAIN:localhost} {
+	encode zstd gzip
+	reverse_proxy lims:3000
+}

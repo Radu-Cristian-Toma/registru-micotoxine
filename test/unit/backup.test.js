@@ -27,6 +27,7 @@ test('copia are aceleași date ca sursa, inclusiv cele din WAL, și trece verifi
   const r = await backupDatabase(file, path.join(tmp, 'out1'));
   assert.ok(r.check.ok);
   assert.ok(fs.existsSync(r.destPath));
+  assert.deepEqual(fs.readdirSync(path.join(tmp, 'out1')), [path.basename(r.destPath)], 'copia este un singur fișier, fără -wal/-shm');
   const copy = new Database(r.destPath, { readonly: true });
   assert.equal(copy.prepare('SELECT COUNT(*) n FROM child').get().n, 3);
   assert.equal(copy.prepare('SELECT COUNT(*) n FROM parent').get().n, 2);

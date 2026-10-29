@@ -1,0 +1,37 @@
+# Utilizare: copiați docker/env.example ca .env, completați, apoi:  docker compose up -d
+# Aplicația nu este publicată direct; accesul se face numai prin proxy-ul HTTPS (Caddy).
+services:
+  lims:
+    build: .
+    image: lims-micotoxine:1.55.0
+    restart: unless-stopped
+    environment:
+      LIMS_ADMIN_EMAIL: ${LIMS_ADMIN_EMAIL:-}
+      LIMS_ADMIN_NAME: ${LIMS_ADMIN_NAME:-}
+      LIMS_BACKUP_PASSPHRASE: ${LIMS_BACKUP_PASSPHRASE:-}
+      LIMS_SOURCE_URL: ${LIMS_SOURCE_URL:-}
+      LIMS_DEMO: ${LIMS_DEMO:-}
+    volumes:
+      - lims-data:/data
+    expose:
+      - "3000"
+
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - lims
+    environment:
+      LIMS_DOMAIN: ${LIMS_DOMAIN:-localhost}
+    ports:
+      - "${LIMS_HTTP_PORT:-80}:80"
+      - "${LIMS_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  lims-data:
+  caddy-data:
+  caddy-config:

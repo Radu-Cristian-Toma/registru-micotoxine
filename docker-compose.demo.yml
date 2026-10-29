@@ -1,0 +1,16 @@
+# Instanță de demonstrație (date inventate), fără HTTPS, numai pe calculatorul local:
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d lims
+# Deschideți http://localhost:3000 . Conturile demo sunt afișate în jurnal:  docker compose logs lims
+# NU se folosește cu date reale. Aplicația refuză LIMS_DEMO în producție.
+services:
+  lims:
+    environment:
+      NODE_ENV: development
+      LIMS_DEMO: "1"
+      LIMS_TRUST_PROXY: ""
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - lims-demo-data:/data
+volumes:
+  lims-demo-data:

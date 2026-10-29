@@ -1,5 +1,7 @@
 # Instalare și operare pentru pilot
 
+> Calea recomandată din v1.55.0 este pachetul Docker: `docs/DISTRIBUTIE.md`. Documentul de față descrie instalarea fără Docker.
+
 **Stare:** aplicația este un pilot; nu este validată sau acreditată. Documentul descrie ce trebuie pregătit pentru o utilizare controlată, cu date reale, **după** ce laboratorul a parcurs `docs/LISTA_VERIFICARE_LABORATOR.md` și `docs/VALIDARE_PILOT.md`. Valorile marcate [de completat] aparțin laboratorului.
 
 ## 1. Cerințe
@@ -8,7 +10,7 @@
 - Un disc cu spațiu pentru baza de date, copiile de siguranță și rezumatele exportate [dimensionare de completat].
 
 ## 2. Instalare
-1. Copiați depozitul la versiunea etichetată a pilotului: `git clone … && git checkout v1.54.0` [eticheta se creează după îmbinare].
+1. Copiați depozitul la versiunea etichetată a pilotului: `git clone … && git checkout <eticheta versiunii livrate>` [eticheta o creează titularul depozitului] sau dezarhivarea pachetului.
 2. `npm ci --omit=dev` (instalează exact versiunile din `package-lock.json`); apoi `npm audit --omit=dev` (trebuie să nu raporteze vulnerabilități).
 3. Creați fișierul `.env` (nu intră în depozit) pornind de la `.env.example`:
    - `NODE_ENV=production`;
@@ -17,7 +19,7 @@
    - `LIMS_HOST=127.0.0.1` (aplicația ascultă numai local; proxy-ul o expune pe HTTPS);
    - `LIMS_DB_PATH` dacă baza nu stă în `db/lims.db`;
    - `LIMS_BACKUP_PASSPHRASE` pentru copii criptate (minimum 12 caractere), păstrată separat.
-4. Primul cont de administrator: `node db/seed-admin.js <email> <parola> "<nume>"`. **Alegeți o parolă nouă, nu una de test**; apoi schimbați-o din butonul „Parola” dacă a fost comunicată pe alt canal.
+4. Primul cont de administrator: `node scripts/first-run.js admin --email <email>` (parolă temporară aleatoare) sau `node db/seed-admin.js <email> <parola> "<nume>"`. **Alegeți o parolă nouă, nu una de test**; apoi schimbați-o din butonul „Parola” dacă a fost comunicată pe alt canal.
 5. Pornire: `node server.js` (sau prin serviciul de sistem de mai jos). La pornire, în producție, aplicația refuză configurările nesigure și spune ce lipsește.
 
 ### Serviciu systemd (exemplu; de adaptat)

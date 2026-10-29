@@ -2,7 +2,7 @@
 
 ## Raportarea unei vulnerabilități
 
-Nu deschideți un subiect public pentru o vulnerabilitate. Scrieți la **[de completat: adresa de contact pentru securitate]**
+Nu deschideți un subiect public pentru o vulnerabilitate. Scrieți la **info.lab@bth.usamv.ro**
 cu: versiunea (`/api/auth/me` → `instance.version`, sau subsolul aplicației), descrierea, pașii de reproducere și efectul.
 Nu atașați date reale ale laboratorului sau ale beneficiarilor. Termen țintă de răspuns: [de completat].
 

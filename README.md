@@ -81,7 +81,7 @@ Limitele legale pentru micotoxine sunt corelate cu Reg. (UE) 2023/915 (inclusiv 
 
 ## Instalare pentru laborator
 
-Pachet Docker cu proxy HTTPS și instanță de demonstrație: `docs/DISTRIBUTIE.md`. Licență: AGPL-3.0-or-later (`LICENSE`).
+Pachet Docker cu proxy HTTPS și instanță de demonstrație: `docs/DISTRIBUTIE.md`. Licență: AGPL-3.0-or-later (`LICENSE`); titular: Toma Radu Cristian; proiect: METROFOOD.
 
 ## Pornire locală
 

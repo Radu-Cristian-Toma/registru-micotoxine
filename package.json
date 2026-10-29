@@ -3,6 +3,7 @@
   "version": "1.55.0",
   "description": "PoC LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine",
   "license": "AGPL-3.0-or-later",
+  "author": "Toma Radu Cristian",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

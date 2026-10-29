@@ -26,15 +26,15 @@
       refLot: D('Lot de referință (opțional)', 'Reference lot (optional)'), notes: D('Observații', 'Notes'), recordQc: D('Înregistrează controlul', 'Record control'),
       qcRangeHint: D('Intervalul de acceptare îl stabilește laboratorul din validarea metodei [de completat de laborator]; aplicația nu propune valori.', 'The acceptance range is set by the laboratory from method validation [to be completed by the laboratory]; the application does not suggest values.'),
       qcOk: D('în termen', 'current'), qcStale: D('control prea vechi', 'control too old'), qcFailed: D('ultimul control a eșuat', 'last control failed'), qcNone: D('fără control', 'no control'),
-      recovery: D('Recuperare', 'Recovery'), outcome: D('Rezultat', 'Outcome'), pass: D('în interval', 'within range'), fail: D('în afara intervalului', 'outside range'), by: D('Înregistrat de', 'Recorded by'), when: D('Data', 'Date'),
+      recovery: D('Recuperare', 'Recovery'), outcome: D('Rezultat', 'Outcome'), pass: D('în interval', 'within range'), fail: D('în afara intervalului', 'outside range'), by: D('Înregistrat de', 'Noted by'), when: D('Data', 'Date'),
       maxAge: D('Interval maxim de la ultimul control', 'Maximum age of last control'), days: D('zile', 'days'),
       // loturi cu mai multe probe de laborator (Reg. 2023/2782, anexa I, partea II)
       ltTitle: D('Loturi cu mai multe probe de laborator', 'Lots with several laboratory samples'),
-      ltIntro: D('Pentru smochine și pentru arahide, sâmburi de caise, fructe cu coajă lemnoasă și mirodenii cu particule mari, decizia se ia pe lot (Reg. (UE) 2023/2782, anexa I, partea II, C.8 și D.8). Probele unui lot aparțin aceluiași beneficiar și se grupează înainte de validare; după validarea oricărei probe lotul este înghețat.', 'For figs and for groundnuts, apricot kernels, tree nuts and dried spices with large particle size, the decision is taken on the lot (Reg. (EU) 2023/2782, Annex I, Part II, C.8 and D.8). The samples of a lot belong to the same client and are grouped before validation; once any sample is validated the lot is frozen.'),
+      ltIntro: D('Pentru smochine și pentru arahide, sâmburi de caise, fructe cu coajă lemnoasă și mirodenii cu particule mari, decizia se ia pe lot (Reg. (UE) 2023/2782, anexa I, partea II, C.8 și D.8). Probele unui lot aparțin aceluiași beneficiar și se grupează înainte de validare; după validarea oricărei probe lotul este înghețat.', 'For figs and for groundnuts, apricot kernels, tree nuts and dried spices with large particle size, the decision is taken on the lot (Reg. (EU) 2023/2782, Annex I, Part II, C.8 and D.8). The samples of a lot belong to the same customer and are grouped before validation; once any sample is validated the lot is frozen.'),
       ltMode: D('Regulă de lot', 'Lot rule'),
       ltModeNone: D('Nicio probă nu depășește limita (smochine; nuci pentru consum final)', 'No sample exceeds the limit (figs; nuts for the final consumer)'),
       ltModeAvg: D('Media probelor (nuci supuse sortării)', 'Average of the samples (nuts subject to sorting)'),
-      ltPick: D('Probe de grupat (aceluiași beneficiar)', 'Samples to group (same client)'),
+      ltPick: D('Probe de grupat (aceluiași beneficiar)', 'Samples to group (same customer)'),
       ltCreate: D('Constituie lotul', 'Create lot'), ltNote: D('Observații', 'Notes'),
       ltNone: D('Niciun lot constituit.', 'No lots yet.'), ltMembers: D('Probe', 'Samples'), ltOverall: D('Decizie de lot', 'Lot decision'),
       ltFinal: D('final', 'final'), ltProvisional: D('provizoriu (nu toate probele sunt validate)', 'provisional (not all samples validated)'),
@@ -73,19 +73,19 @@
       intakeNotes: D('Observații la recepție', 'Receipt notes'), intakeNotRecorded: D('Starea probei la recepție nu a fost înregistrată.', 'Sample condition at receipt was not recorded.'),
       // buletin
       bulSampleCond: D('Starea probei la recepție', 'Sample condition at receipt'), bulBasis: D('Baza de raportare', 'Reporting basis'), bulLabSample: D('Proba de laborator', 'Laboratory sample'),
-      bulSampling: D('Date de prelevare declarate de beneficiar', 'Sampling data declared by the client'), bulLot: D('Dimensiunea lotului', 'Lot size'), bulIncr: D('Probe elementare', 'Increments'), bulMethod: D('Metodă / plan de prelevare', 'Sampling method / plan'),
+      bulSampling: D('Date de prelevare declarate de beneficiar', 'Sampling data declared by the customer'), bulLot: D('Dimensiunea lotului', 'Lot size'), bulIncr: D('Probe elementare', 'Increments'), bulMethod: D('Metodă / plan de prelevare', 'Sampling method / plan'),
       bulTrace: D('Echipamente și loturi folosite', 'Equipment and lots used'), bulCalDue: D('calibrare până la', 'calibrated until'), bulExpires: D('expiră', 'expires'), bulMass: D('masă', 'mass'), bulRepl: D('replici', 'replicates'),
       samplingDisclaimer: D('Laboratorul nu a fost responsabil de etapa de prelevare.', 'The laboratory was not responsible for the sampling stage.'),
       // stare buletin
-      lcWithdrawn: D('BULETIN RETRAS', 'BULLETIN WITHDRAWN'), lcSuperseded: D('BULETIN ÎNLOCUIT', 'BULLETIN SUPERSEDED'),
-      lcWithdrawnText: D('Acest buletin nu mai este valabil.', 'This bulletin is no longer valid.'), lcSupersededText: D('Acest buletin a fost înlocuit de buletinul', 'This bulletin has been replaced by bulletin'),
+      lcWithdrawn: D('BULETIN RETRAS', 'TEST REPORT WITHDRAWN'), lcSuperseded: D('BULETIN ÎNLOCUIT', 'TEST REPORT SUPERSEDED'),
+      lcWithdrawnText: D('Acest buletin nu mai este valabil.', 'This test report is no longer valid.'), lcSupersededText: D('Acest buletin a fost înlocuit de buletinul', 'This test report has been replaced by test report'),
       lcReason: D('Motiv', 'Reason'), lcOn: D('la', 'on'),
-      withdrawBtn: D('Retrage buletinul', 'Withdraw bulletin'), supersedeBtn: D('Marchează ca înlocuit', 'Mark as superseded'), dossierBtn: D('Exportă dosarul', 'Export file'), exportBtn: D('Exportă rezultatul (JSON)', 'Export result (JSON)'),
+      withdrawBtn: D('Retrage buletinul', 'Withdraw test report'), supersedeBtn: D('Marchează ca înlocuit', 'Mark as superseded'), dossierBtn: D('Exportă dosarul', 'Export file'), exportBtn: D('Exportă rezultatul (JSON)', 'Export result (JSON)'),
       withdrawPrompt: D('Motivul retragerii (rămâne în jurnalul de audit):', 'Reason for withdrawal (kept in the audit log):'),
       supersedePrompt: D('Motivul înlocuirii (rămâne în jurnalul de audit):', 'Reason for replacement (kept in the audit log):'),
-      replacementPrompt: D('Codul probei al cărei buletin îl înlocuiește (ex. MYC-2026-0002):', 'Code of the sample whose bulletin replaces it (e.g. MYC-2026-0002):'),
+      replacementPrompt: D('Codul probei al cărei buletin îl înlocuiește (ex. MYC-2026-0002):', 'Code of the sample whose test report replaces it (e.g. MYC-2026-0002):'),
       replacementUnknown: D('Nu am găsit o probă cu acest cod în coadă.', 'No sample with this code was found in the queue.'),
-      lcDone: D('Starea buletinului a fost înregistrată.', 'Bulletin status recorded.'),
+      lcDone: D('Starea buletinului a fost înregistrată.', 'Test report status recorded.'),
       // politici
       policyTitle: D('Politici de laborator', 'Laboratory policies'), strictRoles: D('Separarea sarcinilor activă', 'Segregation of duties active'),
       strictHint: D('Activă: administratorul nu introduce, nu aprobă și nu validează; cine a aprobat o probă nu o validează. Relaxarea cere motiv și este jurnalizată.', 'Active: the administrator does not enter, review or validate; whoever reviewed a sample does not validate it. Relaxing requires a reason and is logged.'),
@@ -93,7 +93,7 @@
       retentionHint: D('Perioada o stabilește laboratorul [de completat]; apare în dosarul exportat.', 'Set by the laboratory [to be completed]; shown in the exported file.'),
       qcAge: D('Interval maxim de la ultimul control QC (zile; 0 = fără avertisment)', 'Maximum age of last QC control (days; 0 = no warning)'),
       sampLot: D('Dimensiunea lotului (kg, opțional)', 'Lot size (kg, optional)'), sampIncr: D('Număr de probe elementare (opțional)', 'Number of increments (optional)'), sampMethod: D('Metodă / plan de prelevare declarat (opțional)', 'Declared sampling method / plan (optional)'),
-      sampHint: D('Datele de prelevare sunt declarate de beneficiar; laboratorul nu răspunde de prelevare.', 'Sampling data are declared by the client; the laboratory is not responsible for sampling.')
+      sampHint: D('Datele de prelevare sunt declarate de beneficiar; laboratorul nu răspunde de prelevare.', 'Sampling data are declared by the customer; the laboratory is not responsible for sampling.')
     }
   });
 

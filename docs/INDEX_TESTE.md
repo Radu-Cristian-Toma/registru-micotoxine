@@ -1,6 +1,6 @@
 # Index al testelor automate
 
-**Total: 183 teste în 22 fișiere; 183 trecute, 0 eșuate.**
+**Total: 188 teste în 23 fișiere; 188 trecute, 0 eșuate.**
 
 Generat de `node scripts/list-tests.js --write` (rulează testele); nu se editează manual. Fiecare titlu este un test din `test/unit/*.test.js`. **Testele nu înlocuiesc protocolul de validare al laboratorului** (vezi `docs/VALIDARE_PILOT.md`); sunt probă de sprijin pentru calcul, decizie, integritate, acces și flux.
 
@@ -156,6 +156,14 @@ Generat de `node scripts/list-tests.js --write` (rulează testele); nu se editea
 - ✓ exportul de rezumat este refuzat dacă lanțul are discrepanțe
 - ✓ rânduri anterioare introducerii lanțului: avertisment, nu eroare
 - ✓ CLI: export de rezumat, apoi verificare reușită și, după rescriere, eșuată
+
+## i18n-en.test.js (5)
+
+- ✓ fiecare cheie are text EN, fără diacritice românești
+- ✓ terminologie unitară în engleză: „customer”, „test report”, „compliant”
+- ✓ corecții de sens: „Așteaptă analizare” = Awaiting analysis; validează validatorul, nu operatorul
+- ✓ sursele limitelor din profile sunt traduse integral în engleză
+- ✓ matricea de validare VAL-01…15 are text EN pentru toate testele
 
 ## issued-branding.test.js (1)
 

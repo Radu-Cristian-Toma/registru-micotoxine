@@ -370,7 +370,7 @@ function performanceBulletinHtml(sample) {
 // Provenienta limitelor afisate (L5): profil / implicite / manual / nedocumentat.
 function limitProvenanceText(sample) {
   const basis = sample && sample.limitBasis;
-  if (basis === 'profile') return `${t('operator.limitBasisProfile')} ${escapeHtml(sample.limitSource || '')}`;
+  if (basis === 'profile') return `${t('operator.limitBasisProfile')} ${escapeHtml(limitSourceText(sample.limitSource || ''))}`;
   if (basis === 'fallback') return `⚠ ${t('operator.limitBasisFallback')}`;
   if (basis === 'manual') return `${t('operator.limitBasisManual')} ${escapeHtml(sample.limitOverrideReason || '')}`;
   if (basis === 'none') return t('operator.limitBasisNone');
@@ -1637,7 +1637,7 @@ function renderBulletinReadOnly(sample) {
         </tbody>
       </table>
 
-      <div class="section-hint" style="margin:8px 0;"><div><strong>${bt('bulletin.limitsBasis')}</strong></div>${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${escapeHtml(sample.limitSource || '')}${sample.limitRegulationRef ? ` — ${escapeHtml(sample.limitRegulationRef)}` : ''}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
+      <div class="section-hint" style="margin:8px 0;"><div><strong>${bt('bulletin.limitsBasis')}</strong></div>${sample.limitBasis === 'profile' || sample.limitBasis === 'manual' ? `${btLimitSource(sample.limitSource || '', sample.limitRegulationRef || '')}${sample.limitBasis === 'manual' ? ` — ${bt('bulletin.limitsManual')}: ${escapeHtml(sample.limitOverrideReason || '')}` : ''}` : (sample.limitBasis === 'fallback' ? bt('bulletin.limitsFallback') : bt('bulletin.limitsUndocumented'))}</div>
 
       ${performanceBulletinHtml(sample)}
       ${sample.bulletinHash ? `<div class="section-hint" style="margin:4px 0;"><div><strong>${bt('bulletin.fingerprint')}</strong></div><div class="mono" style="word-break:break-all;">${escapeHtml(sample.bulletinHash)}</div></div>` : ''}
@@ -3735,7 +3735,7 @@ async function renderValidationPanel() {
     <div class="validation-list">
       ${validationTests.map(t2 => `<article class="validation-test ${escapeHtml(t2.result || 'not_run')}">
         <div class="validation-test-code">${escapeHtml(t2.code)}</div>
-        <div class="validation-test-body"><div class="validation-test-title"><h4>${escapeHtml(t2.title)}</h4><span class="quality-badge ${t2.result === 'passed' ? 'covered' : t2.result === 'failed' ? 'outside' : 'partial'}">${labels[t2.result] || t('admin.valNotRun')}</span></div><div class="validation-area">${escapeHtml(t2.area)}</div><p><strong>${t('admin.valExpectedResult')}</strong> ${escapeHtml(t2.expected)}</p>${t2.note ? `<p class="validation-note"><strong>${t('admin.valNotePrefix')}</strong> ${escapeHtml(t2.note)}</p>` : ''}${t2.executedAt ? `<small>${t('admin.valExecutedAtPrefix')} ${escapeHtml(t2.executedAt)} ${t('admin.valExecutedByPrefix')} ${escapeHtml(t2.executedByName || t('admin.valUserFallback'))}</small>` : ''}</div>
+        <div class="validation-test-body"><div class="validation-test-title"><h4>${escapeHtml(valTestText(t2).title)}</h4><span class="quality-badge ${t2.result === 'passed' ? 'covered' : t2.result === 'failed' ? 'outside' : 'partial'}">${labels[t2.result] || t('admin.valNotRun')}</span></div><div class="validation-area">${escapeHtml(valTestText(t2).area)}</div><p><strong>${t('admin.valExpectedResult')}</strong> ${escapeHtml(valTestText(t2).expected)}</p>${t2.note ? `<p class="validation-note"><strong>${t('admin.valNotePrefix')}</strong> ${escapeHtml(t2.note)}</p>` : ''}${t2.executedAt ? `<small>${t('admin.valExecutedAtPrefix')} ${escapeHtml(t2.executedAt)} ${t('admin.valExecutedByPrefix')} ${escapeHtml(t2.executedByName || t('admin.valUserFallback'))}</small>` : ''}</div>
         <div class="validation-actions"><button class="btn secondary small-btn" data-val-id="${t2.id}" data-val-result="passed">${t('admin.valPassBtn')}</button><button class="btn secondary small-btn" data-val-id="${t2.id}" data-val-result="failed">${t('admin.valFailBtn')}</button><button class="btn secondary small-btn" data-val-id="${t2.id}" data-val-result="not_run">${t('admin.valResetBtn')}</button></div>
       </article>`).join('')}
     </div>`;

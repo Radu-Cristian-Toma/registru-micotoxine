@@ -134,3 +134,69 @@ test('verify-integrity: instantanee intacte → fără discrepanțe; buletin fă
 test('VAL-08 are textul corectat', () => {
   assert.match(db.prepare(`SELECT expected FROM system_validation_tests WHERE code = 'VAL-08'`).get().expected, /fără a expune rezultatele/);
 });
+
+// Verificare publică în stări: autentic / modificat / lipsă / neverificabil.
+test('verificare publică: autentic fără amprentă prezentată și cu amprenta din QR; modificat cu amprentă greșită', async () => {
+  const { id, bulletinNo } = await issueBulletin();
+  currentUser = null;
+  const plain = await call('GET', `/api/results/public/verify/${bulletinNo}`);
+  assert.equal(plain.body.verification.state, 'authentic');
+  const hash = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE sample_id = ?').get(id).snapshot_hash;
+  const ok = await call('GET', `/api/results/public/verify/${bulletinNo}?h=${hash.slice(0, 16)}`);
+  assert.equal(ok.body.verification.state, 'authentic');
+  const bad = await call('GET', `/api/results/public/verify/${bulletinNo}?h=${'0'.repeat(16)}`);
+  assert.equal(bad.status, 200);
+  assert.equal(bad.body.verification.state, 'modified');
+  assert.deepEqual(bad.body.verification.reasons, ['presented_fingerprint_differs']);
+  const junk = await call('GET', `/api/results/public/verify/${bulletinNo}?h=zz`);
+  assert.equal(junk.body.verification.state, 'authentic');
+  assert.deepEqual(junk.body.verification.reasons, ['presented_fingerprint_malformed']);
+});
+
+test('verificare publică: număr inexistent → lipsă (404 cu stare)', async () => {
+  currentUser = null;
+  const r = await call('GET', '/api/results/public/verify/NU-EXISTA-0001');
+  assert.equal(r.status, 404);
+  assert.equal(r.body.verification.state, 'missing');
+});
+
+test('verificare publică: instantaneu stocat alterat (declanșatoare ocolite) → modificat; fără instantaneu → neverificabil', async () => {
+  const { id, bulletinNo } = await issueBulletin();
+  db.exec('DROP TRIGGER bulletin_snapshots_no_update');
+  try {
+    db.prepare('UPDATE bulletin_snapshots SET snapshot_json = ? WHERE sample_id = ?').run('{"alterat":true}', id);
+    currentUser = null;
+    const r = await call('GET', `/api/results/public/verify/${bulletinNo}`);
+    assert.equal(r.body.verification.state, 'modified');
+    assert.deepEqual(r.body.verification.reasons, ['stored_snapshot_altered']);
+  } finally {
+    db.exec(`CREATE TRIGGER IF NOT EXISTS bulletin_snapshots_no_update BEFORE UPDATE ON bulletin_snapshots
+      BEGIN SELECT RAISE(ABORT, 'bulletin_snapshots este append-only: modificarea este interzisa'); END`);
+  }
+});
+
+test('QR-ul buletinului conține amprenta (primele 16 caractere) a instantaneului emis', async () => {
+  const { id, bulletinNo } = await issueBulletin();
+  as('owner');
+  const r = await call('GET', `/api/results/${id}/bulletin-qr`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const hash = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE sample_id = ?').get(id).snapshot_hash;
+  assert.match(r.body.url, new RegExp(`/verify/${bulletinNo}\\?h=${hash.slice(0, 16)}$`));
+});
+
+test('export structurat al rezultatului: din instantaneul emis, cu integritate și stare de ciclu de viață', async () => {
+  const { id, bulletinNo } = await issueBulletin();
+  as('owner');
+  const r = await call('GET', `/api/results/${id}/export`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.schema, 'registru-micotoxine/result-export/1');
+  assert.equal(r.body.bulletin.number, bulletinNo);
+  assert.equal(r.body.bulletin.integrity, 'ok');
+  assert.equal(r.body.bulletin.lifecycle.state, 'valid');
+  const ota = r.body.measurements.find(m => m.key === 'ota');
+  assert.equal(ota.value.value, 1.2);
+  // un beneficiar străin nu are acces
+  currentUser = { id: ids.operator + 999, role: 'owner', fullName: 'Altul' };
+  const forbidden = await call('GET', `/api/results/${id}/export`);
+  assert.ok([403, 404].includes(forbidden.status), String(forbidden.status));
+});

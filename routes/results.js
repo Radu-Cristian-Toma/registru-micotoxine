@@ -87,6 +87,7 @@ function buildBulletinSnapshot(sampleId, userId) {
   };
 }
 
+const { buildResultExport } = require('../db/result-export');
 const router = express.Router();
 
 // Reguli disponibile pentru aplicație. Nu presupun existența unui instrument.
@@ -1058,10 +1059,38 @@ router.get('/:sampleId/bulletin-qr', requireRole('owner', 'operator', 'validator
   const localPort = req.socket.localPort;
   const lan = findLanAddress();
   const lanHost = lan ? `${lan.address}:${localPort}` : req.get('host');
-  const url = `${req.protocol}://${lanHost}/verify/${encodeURIComponent(row.bulletinNo)}`;
+  // Amprenta (primele 16 caractere hex ale SHA-256 al instantaneului emis) se include în adresa din QR,
+  // ca pagina publică să poată semnala un document prezentat care nu corespunde buletinului emis.
+  const snapRow = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE sample_id = ?').get(req.params.sampleId);
+  const fp = snapRow ? `?h=${snapRow.snapshot_hash.slice(0, 16)}` : '';
+  const url = `${req.protocol}://${lanHost}/verify/${encodeURIComponent(row.bulletinNo)}${fp}`;
   const dataUrl = await QRCode.toDataURL(url, { width: 240, margin: 1 });
   res.json({ url, dataUrl });
 });
+
+// Verificare publică în stări (autentic / modificat / lipsă / neverificabil).
+//  - lipsă: numărul nu corespunde niciunui buletin emis (răspuns 404);
+//  - modificat: instantaneul stocat nu mai corespunde amprentei lui, sau amprenta
+//    prezentată de verificator (parametrul ?h=, din QR-ul tipărit) nu este a
+//    buletinului emis;
+//  - neverificabil: buletin emis înainte de introducerea instantaneelor;
+//  - autentic: instantaneul este intact și, dacă s-a prezentat o amprentă, o confirmă.
+// „Autentic” nu înseamnă „valabil”: starea de retragere/înlocuire este raportată separat.
+function publicVerification(snap, presented) {
+  if (!snap) return { state: 'unverifiable', reasons: ['no_snapshot'] };
+  const reasons = [];
+  if (sha256(snap.snapshot_json) !== snap.snapshot_hash) reasons.push('stored_snapshot_altered');
+  const h = typeof presented === 'string' ? presented.trim().toLowerCase() : '';
+  if (h) {
+    if (/^[0-9a-f]{12,64}$/.test(h)) {
+      if (!snap.snapshot_hash.startsWith(h)) reasons.push('presented_fingerprint_differs');
+    } else {
+      reasons.push('presented_fingerprint_malformed');
+    }
+  }
+  const modified = reasons.some(r => r !== 'presented_fingerprint_malformed');
+  return { state: modified ? 'modified' : 'authentic', reasons };
+}
 
 router.get('/public/verify/:bulletinNo', (req, res) => {
   const row = db.prepare(`
@@ -1078,7 +1107,7 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
     LEFT JOIN users u ON u.id = r.validated_by
     WHERE r.bulletin_no = ? AND r.validation_status = 'validated'
   `).get(req.params.bulletinNo);
-  if (!row) return res.status(404).json({ error: 'Buletin inexistent sau neverificat.' });
+  if (!row) return res.status(404).json({ error: 'Buletin inexistent sau neverificat.', verification: { state: 'missing', reasons: ['not_issued'] } });
 
   const afVals = [row.afb1, row.afb2, row.afg1, row.afg2];
   const afSum = afVals.every(v => v !== null && v !== undefined) ? afVals.reduce((a, b) => a + b, 0) : null;
@@ -1090,15 +1119,17 @@ router.get('/public/verify/:bulletinNo', (req, res) => {
   // amprenta SHA-256 a instantaneului emis. Rezultatele analitice NU sunt
   // expuse public, decat daca laboratorul activeaza explicit
   // LIMS_PUBLIC_VERIFY_RESULTS=1 (Etapa B4, L18).
-  const snap = db.prepare('SELECT snapshot_hash FROM bulletin_snapshots WHERE bulletin_no = ?').get(row.bulletinNo);
+  const snap = db.prepare('SELECT snapshot_json, snapshot_hash FROM bulletin_snapshots WHERE bulletin_no = ?').get(row.bulletinNo);
   const snapshotHash = snap ? snap.snapshot_hash : null;
+  const verification = publicVerification(snap, req.query.h);
   const sampleRow = db.prepare('SELECT sample_id FROM results WHERE bulletin_no = ?').get(row.bulletinNo);
   const lc = bulletinLifecycle(sampleRow.sample_id);
   const lifecycle = { state: lc.state, reason: lc.reason || null, at: lc.at || null, replacedByBulletinNo: lc.replacedByBulletinNo || null };
   if (process.env.LIMS_PUBLIC_VERIFY_RESULTS !== '1') {
-    return res.json({ bulletin: { detailLevel: 'minimal', bulletinNo: row.bulletinNo, issuedAt: row.issuedAt, validatedAt: row.validatedAt, snapshotHash, lifecycle } });
+    return res.json({ verification, bulletin: { detailLevel: 'minimal', bulletinNo: row.bulletinNo, issuedAt: row.issuedAt, validatedAt: row.validatedAt, snapshotHash, lifecycle } });
   }
   res.json({
+    verification,
     bulletin: {
       detailLevel: 'full',
       lifecycle,
@@ -1133,6 +1164,20 @@ router.get('/:sampleId/bulletin-snapshot', requireRole('owner', 'operator', 'val
   if (!row) return res.status(404).json({ error: 'Pentru această probă nu există un instantaneu de buletin (nevalidată sau emisă înainte de introducerea instantaneelor).' });
   const intact = sha256(row.snapshot_json) === row.snapshot_hash;
   res.json({ bulletinNo: row.bulletin_no, issuedAt: row.issued_at, snapshotSha256: row.snapshot_hash, integrity: intact ? 'ok' : 'mismatch', snapshot: JSON.parse(row.snapshot_json) });
+});
+
+// Export structurat (JSON) al rezultatului unui buletin emis, din instantaneul stocat.
+router.get('/:sampleId/export', requireRole('owner', 'operator', 'validator', 'admin'), requireSampleAccess('sampleId'), (req, res) => {
+  const row = db.prepare('SELECT snapshot_json, snapshot_hash, bulletin_no FROM bulletin_snapshots WHERE sample_id = ?').get(req.params.sampleId);
+  if (!row) return res.status(404).json({ error: 'Pentru această probă nu există un buletin emis cu instantaneu.' });
+  const intact = sha256(row.snapshot_json) === row.snapshot_hash;
+  const lc = bulletinLifecycle(req.params.sampleId);
+  const out = buildResultExport(JSON.parse(row.snapshot_json), {
+    snapshotSha256: row.snapshot_hash, integrity: intact ? 'ok' : 'mismatch',
+    lifecycle: { state: lc.state, reason: lc.reason || null, at: lc.at || null, replacedByBulletinNo: lc.replacedByBulletinNo || null }
+  });
+  res.set('Content-Disposition', `attachment; filename="${String(row.bulletin_no).replace(/[^A-Za-z0-9_.-]/g, '_')}.json"`);
+  res.json(out);
 });
 
 // Antetul si semnatura asa cum au fost la emiterea buletinului (din instantaneu

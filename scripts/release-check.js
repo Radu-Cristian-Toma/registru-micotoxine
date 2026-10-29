@@ -27,6 +27,7 @@ const required = [
   'config.js',
   'scripts/backup-db.js',
   'scripts/backup-crypto.js',
+  'scripts/list-tests.js',
   'scripts/export-digest.js',
   'scripts/verify-integrity.js',
   'scripts/verify-integrity.js',
@@ -52,8 +53,8 @@ for (const file of required) {
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
-if (pkg.version !== '1.53.5') errors.push(`package.json are versiunea ${pkg.version}`);
-if (lock.version !== '1.53.5' || lock.packages?.['']?.version !== '1.53.5') errors.push('package-lock.json nu este sincronizat cu v1.53.5');
+if (pkg.version !== '1.54.0') errors.push(`package.json are versiunea ${pkg.version}`);
+if (lock.version !== '1.54.0' || lock.packages?.['']?.version !== '1.54.0') errors.push('package-lock.json nu este sincronizat cu v1.54.0');
 
 for (const file of required.filter(f => f.endsWith('.js'))) {
   const full = path.join(root, file);
@@ -62,7 +63,7 @@ for (const file of required.filter(f => f.endsWith('.js'))) {
 }
 
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-if (!readme.includes('v1.53.5')) errors.push('README.md nu identifică release-ul v1.53.');
+if (!readme.includes('v1.54.0')) errors.push('README.md nu identifică release-ul v1.53.');
 
 if (errors.length) {
   console.error('RELEASE CHECK: FAILED');
@@ -71,4 +72,4 @@ if (errors.length) {
 }
 
 console.log('RELEASE CHECK: PASSED');
-console.log('v1.53.5: structură, versiuni și sintaxa JavaScript sunt coerente.');
+console.log('v1.54.0: structură, versiuni și sintaxa JavaScript sunt coerente.');

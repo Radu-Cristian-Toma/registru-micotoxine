@@ -1,6 +1,6 @@
 {
   "name": "usamv-registru-micotoxine",
-  "version": "1.53.5",
+  "version": "1.54.0",
   "description": "PoC LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine",
   "main": "server.js",
   "scripts": {
@@ -10,7 +10,8 @@
     "backup": "node scripts/backup-db.js",
     "test": "node --test \"test/unit/*.test.js\"",
     "verify-integrity": "node scripts/verify-integrity.js",
-    "digest": "node scripts/export-digest.js"
+    "digest": "node scripts/export-digest.js",
+    "list-tests": "node scripts/list-tests.js --write"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.0",

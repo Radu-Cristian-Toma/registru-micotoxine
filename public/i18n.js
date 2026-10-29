@@ -1227,6 +1227,9 @@ const TRANSLATIONS = {
     minimalNote: { ro: 'Această pagină confirmă doar autenticitatea buletinului. Rezultatele analitice nu sunt publice; se obțin de la laborator sau de la beneficiar.', en: 'This page only confirms the authenticity of the bulletin. Analytical results are not public; obtain them from the laboratory or the client.' },
     lifecycleWithdrawn: { ro: 'Buletin autentic, dar RETRAS — nu mai este valabil.', en: 'Authentic bulletin, but WITHDRAWN — no longer valid.' },
     lifecycleSuperseded: { ro: 'Buletin autentic, dar ÎNLOCUIT de buletinul', en: 'Authentic bulletin, but SUPERSEDED by bulletin' },
+    stateModifiedPresented: { ro: 'ATENȚIE: documentul prezentat NU corespunde buletinului emis cu acest număr. Amprenta din codul QR diferă de cea înregistrată de laborator; documentul poate fi alterat sau falsificat.', en: 'WARNING: the document presented does NOT match the bulletin issued under this number. The fingerprint in the QR code differs from the one recorded by the laboratory; the document may be altered or forged.' },
+    stateModifiedStored: { ro: 'ATENȚIE: înregistrarea acestui buletin în sistemul laboratorului nu mai corespunde amprentei de la emitere. Contactați laboratorul.', en: 'WARNING: the record of this bulletin in the laboratory system no longer matches its fingerprint at issuance. Contact the laboratory.' },
+    stateUnverifiable: { ro: 'Buletinul există, dar a fost emis înainte de introducerea instantaneelor și autenticitatea conținutului nu poate fi verificată automat. Contactați laboratorul.', en: 'The bulletin exists but was issued before snapshots were introduced, so its content cannot be verified automatically. Contact the laboratory.' },
     lifecycleReason: { ro: 'Motiv', en: 'Reason' },
     authenticIssuedAt: { ro: 'Buletin autentic — emis de laborator la', en: 'Authentic bulletin — issued by the laboratory on' },
     bulletinNumberShort: { ro: 'Nr. buletin:', en: 'Bulletin no.:' },
@@ -1283,6 +1286,23 @@ function bt(path) {
   const primar = currentLang === 'en' ? node.en : node.ro;
   const secundar = currentLang === 'en' ? node.ro : node.en;
   return `${primar}<span class="bulletin-en">${secundar}</span>`;
+}
+
+// Varianta „în rând” a lui bt(): pentru fragmente care intră într-o propoziție (rezumatul regulii
+// de decizie și al performanței metodei de pe buletin). bt() pune engleza pe rând separat
+// (display: block), ceea ce rupe propoziția la tipărire; aici engleza urmează în paranteză, pe același rând.
+function bti(path) {
+  const parts = path.split('.');
+  let node = TRANSLATIONS;
+  for (const p of parts) {
+    node = node && node[p];
+    if (!node) break;
+  }
+  if (!node || typeof node.ro === 'undefined') return path;
+  if (!node.en || node.en === node.ro) return node.ro;
+  const primar = currentLang === 'en' ? node.en : node.ro;
+  const secundar = currentLang === 'en' ? node.ro : node.en;
+  return `${primar}<span class="bulletin-en-inline"> (${secundar})</span>`;
 }
 
 // Traduce bilingv o eticheta de categorie de produs generata pe server

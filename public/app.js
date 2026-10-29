@@ -344,13 +344,13 @@ function performanceBulletinHtml(sample) {
     const p = perf[g];
     const bits = [];
     if (p.uRelPct !== undefined) bits.push(`U = ±${p.uRelPct}% (k = 2)`);
-    if (p.recoveryPct !== undefined) bits.push(`${bt('bulletin.recovery')} ${p.recoveryPct}% (${p.corrected === true ? bt('bulletin.recoveryCorrected') : bt('bulletin.recoveryNotCorrected')})`);
+    if (p.recoveryPct !== undefined) bits.push(`${bti('bulletin.recovery')} ${p.recoveryPct}% (${p.corrected === true ? bti('bulletin.recoveryCorrected') : bti('bulletin.recoveryNotCorrected')})`);
     if (p.loq !== undefined) {
       bits.push(`LOQ ${p.loq}`);
       const vals = (valueOf[g] || []).filter(v => v !== null && v !== undefined);
       if (vals.some(v => v < p.loq)) bits.push("&lt;LOQ");
     }
-    if (g === 'aflatoxins' && p.loq !== undefined) bits.push(bt('bulletin.lowerBoundNote'));
+    if (g === 'aflatoxins' && p.loq !== undefined) bits.push(bti('bulletin.lowerBoundNote'));
     if (p.corrected === true) {
       const keys = { aflatoxins: ['afb1', 'aflaSum'], ota: ['ota'], m1: ['m1'], don: ['don'], zea: ['zea'], fum: ['fum'] }[g] || [];
       const used = keys.map(k => {
@@ -359,12 +359,12 @@ function performanceBulletinHtml(sample) {
         const a = window.DecisionCore.assess(k, measured, null, 'simple', perf);
         return `${k === 'aflaSum' ? 'Σ' : k.toUpperCase()} ${Number(a.effective).toFixed(2)}`;
       }).filter(Boolean);
-      if (used.length) bits.push(`${bt('bulletin.valueUsed')}: ${used.join(', ')}`);
+      if (used.length) bits.push(`${bti('bulletin.valueUsed')}: ${used.join(', ')}`);
     }
     return `${escapeHtml(g)}: ${bits.join('; ')}`;
   });
-  const ruleText = rule === 'reg_2782_u' ? bt('bulletin.ruleReg2782') : bt('bulletin.ruleSimple');
-  return `<div class="section-hint" style="margin:6px 0;">${bt('bulletin.decisionRule')}: ${ruleText}${parts.length ? `<br>${parts.join('<br>')}` : ''}</div>`;
+  const ruleText = rule === 'reg_2782_u' ? bti('bulletin.ruleReg2782') : bti('bulletin.ruleSimple');
+  return `<div class="section-hint perf-summary" style="margin:6px 0;">${bti('bulletin.decisionRule')}: ${ruleText}${parts.length ? `<br>${parts.map(x => `<span class="perf-line">${x}</span>`).join('<br>')}` : ''}</div>`;
 }
 
 // Provenienta limitelor afisate (L5): profil / implicite / manual / nedocumentat.

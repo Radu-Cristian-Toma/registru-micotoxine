@@ -31,6 +31,7 @@
   }
   .verify-status-banner.valid { background: var(--ok-bg); color: var(--ok); }
   .verify-status-banner.invalid { background: var(--danger-bg); color: var(--danger); }
+  .verify-status-banner.warn { background: var(--warn-bg, #fff4d6); color: var(--warn, #7a5200); }
   .verify-status-banner .icon { font-size: 22px; }
   .verify-loading { text-align: center; padding: 60px 20px; color: var(--neutral); font-size: 13px; }
   .verify-footer-note {
@@ -99,8 +100,18 @@ async function loadVerification() {
   const content = document.getElementById('content');
 
   // Starea buletinului (retras / înlocuit) apare în bannerul de sus; buletinul autentic valabil rămâne verde.
-  function statusBanner(b) {
+  function statusBanner(b, v) {
     const lc = b.lifecycle || { state: 'valid' };
+    const vs = (v && v.state) || 'authentic';
+    // Starea de verificare: „modificat” și „neverificabil” prevalează peste „autentic”.
+    if (vs === 'modified') {
+      const differs = (v.reasons || []).includes('presented_fingerprint_differs');
+      const text = differs ? bt('verify.stateModifiedPresented') : bt('verify.stateModifiedStored');
+      return `<div class="verify-status-banner invalid"><span class="icon">✕</span><div>${text}</div></div>`;
+    }
+    if (vs === 'unverifiable') {
+      return `<div class="verify-status-banner warn"><span class="icon">?</span><div>${bt('verify.stateUnverifiable')}</div></div>`;
+    }
     if (lc.state === 'withdrawn' || lc.state === 'superseded') {
       const text = lc.state === 'withdrawn' ? bt('verify.lifecycleWithdrawn') : `${bt('verify.lifecycleSuperseded')} <strong>${escapeHtml(lc.replacedByBulletinNo || '—')}</strong>.`;
       return `<div class="verify-status-banner invalid"><span class="icon">!</span><div>${text}<br><span class="section-hint"><strong>${t('verify.lifecycleReason')}:</strong> ${escapeHtml(lc.reason || '—')} · ${escapeHtml(lc.at || '')}</span></div></div>`;
@@ -114,7 +125,8 @@ async function loadVerification() {
   }
 
   try {
-    const res = await fetch(`/api/results/public/verify/${encodeURIComponent(bulletinNo)}`);
+    const presented = new URLSearchParams(window.location.search).get('h');
+    const res = await fetch(`/api/results/public/verify/${encodeURIComponent(bulletinNo)}${presented ? '?h=' + encodeURIComponent(presented) : ''}`);
     const data = await res.json();
 
     if (!res.ok) {
@@ -132,7 +144,7 @@ async function loadVerification() {
     if (b.detailLevel === 'minimal') {
       document.getElementById('footer-note').textContent = '';
       content.innerHTML = `
-        ${statusBanner(b)}
+        ${statusBanner(b, data.verification)}
         <div class="bulletin">
           <div class="field-grid">
             <div class="field"><label>${bt('verify.bulletinNumberShort')}</label><div class="field-static">${escapeHtml(b.bulletinNo)}</div></div>
@@ -147,7 +159,7 @@ async function loadVerification() {
     const isFail = b.status === 'fail';
 
     content.innerHTML = `
-      ${statusBanner(b)}
+      ${statusBanner(b, data.verification)}
 
       <div class="bulletin">
         <div class="bulletin-head">

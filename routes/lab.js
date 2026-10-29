@@ -239,8 +239,19 @@ router.get('/dossier/:sampleId', requireRole(...STAFF), requireSampleAccess('sam
   let retainUntil = null;
   if (retYears && issued) { const y = Number(issued.slice(0, 4)) + retYears; retainUntil = `${y}${issued.slice(4)}`; }
   const strip = (r) => { if (!r) return r; const { logo_data_url, signature_data_url, stamp_data_url, ...rest } = r; return rest; };
+  // Lotul (Etapa D1): doar codul, modul, codurile probelor și, după validarea tuturor probelor, verdictul de lot;
+  // valorile celorlalte probe nu intră în dosarul acestei probe.
+  let lot = null;
+  if (sample.lot_id) {
+    const e = require('../db/lots').evaluateLot(sample.lot_id);
+    if (e) {
+      lot = { code: e.lot.code, lotMode: e.lot.lotMode, memberCodes: e.members.map(m => m.code), final: e.final,
+        overall: e.final ? e.overall : null,
+        analyteVerdicts: e.final ? Object.fromEntries(Object.entries(e.analytes).map(([k, a]) => [k, a.verdict])) : null };
+    }
+  }
   const content = {
-    schema: 1, exportedAt: nowLocal(), sample: strip(sample), result, versions, audit,
+    schema: 1, exportedAt: nowLocal(), sample: strip(sample), result, versions, audit, lot,
     bulletin: snap ? { ...snap, lifecycle: bulletinLifecycle(id) } : null, nonconformingWork: nonconf,
     retention: { years: retYears, retainUntil, note: 'Perioada de retenție o stabilește laboratorul [de completat în setări].' }
   };

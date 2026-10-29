@@ -28,6 +28,27 @@
       qcOk: D('în termen', 'current'), qcStale: D('control prea vechi', 'control too old'), qcFailed: D('ultimul control a eșuat', 'last control failed'), qcNone: D('fără control', 'no control'),
       recovery: D('Recuperare', 'Recovery'), outcome: D('Rezultat', 'Outcome'), pass: D('în interval', 'within range'), fail: D('în afara intervalului', 'outside range'), by: D('Înregistrat de', 'Recorded by'), when: D('Data', 'Date'),
       maxAge: D('Interval maxim de la ultimul control', 'Maximum age of last control'), days: D('zile', 'days'),
+      // loturi cu mai multe probe de laborator (Reg. 2023/2782, anexa I, partea II)
+      ltTitle: D('Loturi cu mai multe probe de laborator', 'Lots with several laboratory samples'),
+      ltIntro: D('Pentru smochine și pentru arahide, sâmburi de caise, fructe cu coajă lemnoasă și mirodenii cu particule mari, decizia se ia pe lot (Reg. (UE) 2023/2782, anexa I, partea II, C.8 și D.8). Probele unui lot aparțin aceluiași beneficiar și se grupează înainte de validare; după validarea oricărei probe lotul este înghețat.', 'For figs and for groundnuts, apricot kernels, tree nuts and dried spices with large particle size, the decision is taken on the lot (Reg. (EU) 2023/2782, Annex I, Part II, C.8 and D.8). The samples of a lot belong to the same client and are grouped before validation; once any sample is validated the lot is frozen.'),
+      ltMode: D('Regulă de lot', 'Lot rule'),
+      ltModeNone: D('Nicio probă nu depășește limita (smochine; nuci pentru consum final)', 'No sample exceeds the limit (figs; nuts for the final consumer)'),
+      ltModeAvg: D('Media probelor (nuci supuse sortării)', 'Average of the samples (nuts subject to sorting)'),
+      ltPick: D('Probe de grupat (aceluiași beneficiar)', 'Samples to group (same client)'),
+      ltCreate: D('Constituie lotul', 'Create lot'), ltNote: D('Observații', 'Notes'),
+      ltNone: D('Niciun lot constituit.', 'No lots yet.'), ltMembers: D('Probe', 'Samples'), ltOverall: D('Decizie de lot', 'Lot decision'),
+      ltFinal: D('final', 'final'), ltProvisional: D('provizoriu (nu toate probele sunt validate)', 'provisional (not all samples validated)'),
+      ltFrozen: D('înghețat', 'frozen'), ltOpen: D('modificabil', 'editable'), ltDetail: D('Detalii', 'Details'), ltDissolve: D('Desființează', 'Dissolve'),
+      ltDissolveConfirm: D('Desființezi lotul? Probele rămân, fără grupare.', 'Dissolve the lot? The samples remain, ungrouped.'),
+      ltCreated: D('Lot constituit.', 'Lot created.'), ltPickMin: D('Alege cel puțin două probe.', 'Pick at least two samples.'),
+      ltAnalyte: D('Analit', 'Analyte'), ltValues: D('Valori efective (µg/kg)', 'Effective values (µg/kg)'), ltLimit: D('Limită', 'Limit'), ltU: D('U relativă (%)', 'Relative U (%)'),
+      ltVerdict: D('Verdict de lot', 'Lot verdict'),
+      ltConform: D('conform', 'conforming'), ltNonConform: D('neconform', 'non-conforming'), ltWithin: D('în incertitudine', 'within uncertainty'), ltNoVerdict: D('fără verdict', 'no verdict'),
+      ltIssues: D('Motive', 'Reasons'),
+      ltIssueLimits: D('probele au limite diferite', 'samples have different limits'), ltIssueRules: D('probele au reguli de decizie diferite', 'samples have different decision rules'),
+      ltIssueU: D('probele au incertitudini diferite', 'samples have different uncertainties'), ltIssueIncomplete: D('lipsește o valoare', 'a value is missing'),
+      ltIssueLimitMissing: D('limită lipsă la unele probe', 'limit missing for some samples'),
+      ltInLot: D('Probă în lotul', 'Sample in lot'),
       // formular rezultat
       extrasTitle: D('Date de laborator și trasabilitate', 'Laboratory data and traceability'),
       basis: D('Baza de raportare', 'Reporting basis'), basisAsIs: D('Masă proaspătă (ca atare)', 'As received (fresh mass)'), basisDry: D('Substanță uscată', 'Dry matter'),
@@ -49,7 +70,7 @@
       lcWithdrawn: D('BULETIN RETRAS', 'BULLETIN WITHDRAWN'), lcSuperseded: D('BULETIN ÎNLOCUIT', 'BULLETIN SUPERSEDED'),
       lcWithdrawnText: D('Acest buletin nu mai este valabil.', 'This bulletin is no longer valid.'), lcSupersededText: D('Acest buletin a fost înlocuit de buletinul', 'This bulletin has been replaced by bulletin'),
       lcReason: D('Motiv', 'Reason'), lcOn: D('la', 'on'),
-      withdrawBtn: D('Retrage buletinul', 'Withdraw bulletin'), supersedeBtn: D('Marchează ca înlocuit', 'Mark as superseded'), dossierBtn: D('Exportă dosarul', 'Export file'),
+      withdrawBtn: D('Retrage buletinul', 'Withdraw bulletin'), supersedeBtn: D('Marchează ca înlocuit', 'Mark as superseded'), dossierBtn: D('Exportă dosarul', 'Export file'), exportBtn: D('Exportă rezultatul (JSON)', 'Export result (JSON)'),
       withdrawPrompt: D('Motivul retragerii (rămâne în jurnalul de audit):', 'Reason for withdrawal (kept in the audit log):'),
       supersedePrompt: D('Motivul înlocuirii (rămâne în jurnalul de audit):', 'Reason for replacement (kept in the audit log):'),
       replacementPrompt: D('Codul probei al cărei buletin îl înlocuiește (ex. MYC-2026-0002):', 'Code of the sample whose bulletin replaces it (e.g. MYC-2026-0002):'),
@@ -209,6 +230,13 @@
         </div>`;
       } catch (_) { /* instantaneul poate lipsi la buletine mai vechi */ }
     }
+    // Proba face parte dintr-un lot cu mai multe probe de laborator (D1): decizia de lot apare numai când toate probele sunt validate (beneficiarul), sau provizoriu (personalul).
+    try {
+      const lt = await api(`/lots/by-sample/${sample.id}`);
+      const showVerdict = lt.final && lt.overall !== undefined;
+      html += `<div class="bulletin-lab section-hint" style="margin:8px 0;"><div class="lab-line"><strong>${L('ltInLot')} <span class="mono">${esc(lt.lot.code)}</span></strong>
+        <div>${lt.lot.lotMode === 'average' ? L('ltModeAvg') : L('ltModeNone')} · ${showVerdict ? verdictChip(lt.overall) : L('ltProvisional')}</div></div></div>`;
+    } catch (_) { /* proba nu este într-un lot */ }
     const lcSlot = document.getElementById('bulletin-lifecycle-slot');
     if (lcSlot) lcSlot.innerHTML = lifecycleBannerHtml(sample.bulletinLifecycle);
     if (isStaff() && sample.bulletinNo) {
@@ -217,9 +245,23 @@
       html += `<div class="bulletin-lab-actions no-print">
         ${canChange ? `<button type="button" class="btn secondary small-btn" id="btn-lc-withdraw">${L('withdrawBtn')}</button>
         <button type="button" class="btn secondary small-btn" id="btn-lc-supersede">${L('supersedeBtn')}</button>` : ''}
-        <button type="button" class="btn secondary small-btn" id="btn-dossier">${L('dossierBtn')}</button></div>`;
+        <button type="button" class="btn secondary small-btn" id="btn-dossier">${L('dossierBtn')}</button>
+        <button type="button" class="btn secondary small-btn" id="btn-export-json">${L('exportBtn')}</button></div>`;
+    } else if (sample.bulletinNo) {
+      html += `<div class="bulletin-lab-actions no-print"><button type="button" class="btn secondary small-btn" id="btn-export-json">${L('exportBtn')}</button></div>`;
     }
     slot.innerHTML = html;
+    document.getElementById('btn-export-json')?.addEventListener('click', async () => {
+      try {
+        const res = await fetch(`/api/results/${sample.id}/export`, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = `rezultat-${sample.bulletinNo || sample.code}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      } catch (err) { showToast(String(err.message || err)); }
+    });
     document.getElementById('btn-lc-withdraw')?.addEventListener('click', async () => {
       const reason = (window.prompt(t('lab.withdrawPrompt')) || '').trim();
       if (!reason) return;
@@ -268,12 +310,16 @@
   async function refreshLabBody() {
     const body = document.getElementById('lab-body');
     if (!body) return;
-    let eq = [], lots = [], ctl = [], st = { groups: [], maxAgeDays: 7 };
+    let eq = [], lots = [], ctl = [], st = { groups: [], maxAgeDays: 7 }, multi = [], candidates = [];
     try {
       const r = await Promise.all([api('/lab/equipment'), api('/lab/reagent-lots'), api('/lab/qc-controls'), api('/lab/qc-status')]);
       eq = r[0].equipment; lots = r[1].lots; ctl = r[2].controls; st = r[3];
     } catch (err) { body.innerHTML = `<p class="section-hint">${esc(err.message)}</p>`; return; }
     registry = { equipment: eq, lots };
+    try {
+      multi = (await api('/lots')).lots;
+      candidates = ((await api('/results/queue')).samples || []).filter(x => !x.lotId && !x.isControlSample && x.validationStatus !== 'validated' && x.status !== 'cancelled');
+    } catch (_) { multi = []; candidates = []; }
     const edit = canEditRegistry();
     const stateLabel = (s) => ({ ok: L('qcOk'), stale: L('qcStale'), failed: L('qcFailed'), none: L('qcNone') }[s]);
     body.innerHTML = `
@@ -290,6 +336,7 @@
         </div><button class="btn" id="btn-qc-add">${L('recordQc')}</button></section>` : ''}
       <section class="lab-section"><h3>${L('qc')}</h3>${ctl.length ? `<div class="table-scroll"><table class="contaminants"><thead><tr><th>${L('when')}</th><th>${L('group')}</th><th>${L('measured')}</th><th>${L('expected')}</th><th>${L('recovery')}</th><th>${L('outcome')}</th><th>${L('by')}</th></tr></thead><tbody>
         ${ctl.map(c => `<tr><td class="mono">${esc(c.createdAt)}</td><td>${esc(GROUP_LABEL[c.analyteGroup])}</td><td class="mono">${esc(c.measuredValue)}</td><td class="mono">${esc(c.expectedValue)}</td><td class="mono">${Math.round(c.recoveryPct * 10) / 10} % <span class="section-hint">(${esc(c.acceptLowPct)}–${esc(c.acceptHighPct)})</span></td><td>${chip(c.outcome === 'pass' ? 'ok' : 'failed', c.outcome === 'pass' ? L('pass') : L('fail'))}</td><td>${esc(c.byName || '')}</td></tr>`).join('')}</tbody></table></div>` : `<p class="section-hint">${L('none')}</p>`}</section>
+      ${lotsSectionHtml(multi, candidates, edit)}
       <section class="lab-section"><h3>${L('equipment')}</h3>
         ${eq.length ? `<div class="table-scroll"><table class="contaminants"><thead><tr><th>${L('code')}</th><th>${L('name')}</th><th>${L('calDue')}</th><th>${L('calRef')}</th><th>${L('status')}</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
         ${eq.map(e => `<tr><td class="mono">${esc(e.code)}</td><td>${esc(e.name)}<div class="section-hint">${esc(e.type || '')} ${esc(e.serialNo || '')} ${esc(e.location || '')}</div></td><td>${chip(e.calibrationState, calLabel(e.calibrationState))}<div class="mono">${esc(e.calibrationDue || '')}</div></td><td>${esc(e.calibrationRef || '')}</td><td>${e.status === 'active' ? L('active') : L('retired')}</td>${edit ? `<td><button class="btn secondary small-btn btn-eq-edit" data-id="${e.id}">${L('edit')}</button> <button class="btn secondary small-btn btn-eq-status" data-id="${e.id}" data-status="${e.status === 'active' ? 'retired' : 'active'}">${e.status === 'active' ? L('retire') : L('reactivate')}</button></td>` : ''}</tr>`).join('')}</tbody></table></div>` : `<p class="section-hint">${L('none')}</p>`}
@@ -304,10 +351,56 @@
           ${fld('lot-cert', L('certValue'), 'number', 'step="any" min="0"')}${fld('lot-certu', L('certU'), 'number', 'step="any" min="0"')}${fld('lot-unit', L('unit'), 'text', 'maxlength="30"')}</div><button class="btn" id="btn-lot-save">${L('save')}</button>` : ''}</section>`;
     wireLabBody(eq);
   }
+  const verdictLabel = (v) => ({ conform: L('ltConform'), non_conform: L('ltNonConform'), within_uncertainty: L('ltWithin') }[v] || L('ltNoVerdict'));
+  const verdictChip = (v) => chip(v === 'conform' ? 'ok' : v === 'non_conform' ? 'expired' : v === 'within_uncertainty' ? 'due_soon' : 'unknown', verdictLabel(v));
+  function lotsSectionHtml(multi, candidates, edit) {
+    const rows = multi.map(l => `<tr><td class="mono">${esc(l.code)}</td><td>${esc(l.productName || '')}</td>
+      <td>${l.lotMode === 'average' ? L('ltModeAvg') : L('ltModeNone')}</td><td class="mono">${esc(l.members)}</td>
+      <td>${verdictChip(l.overall)} <span class="section-hint">${l.final ? L('ltFinal') : L('ltProvisional')}</span></td>
+      <td><span class="section-hint">${l.frozen ? L('ltFrozen') : L('ltOpen')}</span></td>
+      <td><button type="button" class="btn secondary small-btn btn-lt-detail" data-id="${esc(l.id)}">${L('ltDetail')}</button>
+      ${edit && !l.frozen ? `<button type="button" class="btn secondary small-btn btn-lt-dissolve" data-id="${esc(l.id)}">${L('ltDissolve')}</button>` : ''}</td></tr>
+      <tr class="lt-detail-row" id="lt-detail-${esc(l.id)}" hidden><td colspan="7"></td></tr>`).join('');
+    return `<section class="lab-section"><h3>${L('ltTitle')}</h3><p class="section-hint">${L('ltIntro')}</p>
+      ${multi.length ? `<div class="table-scroll"><table class="contaminants"><thead><tr><th>${L('code')}</th><th>${L('name')}</th><th>${L('ltMode')}</th><th>${L('ltMembers')}</th><th>${L('ltOverall')}</th><th>${L('status')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="section-hint">${L('ltNone')}</p>`}
+      ${edit ? `<div class="lab-grid">
+        <div class="field"><label for="lt-mode">${L('ltMode')}</label><select id="lt-mode"><option value="none_exceeds">${L('ltModeNone')}</option><option value="average">${L('ltModeAvg')}</option></select></div>
+        <div class="field"><label for="lt-pick">${L('ltPick')}</label><select id="lt-pick" multiple size="6">${candidates.map(c => `<option value="${esc(c.id)}">${esc(c.code)} · ${esc(c.productName)} · ${esc(c.companyName || '')}</option>`).join('')}</select></div>
+        ${fld('lt-note', L('ltNote'), 'text', 'maxlength="500"')}
+      </div><button class="btn" id="btn-lt-create">${L('ltCreate')}</button>` : ''}</section>`;
+  }
+  const issueLabel = (i) => ({ limits_differ: L('ltIssueLimits'), rules_differ: L('ltIssueRules'), uncertainty_differs: L('ltIssueU'), incomplete: L('ltIssueIncomplete'), limit_missing_for_some_samples: L('ltIssueLimitMissing') }[i] || i);
+  function lotDetailHtml(e) {
+    const rows = Object.entries(e.analytes).map(([k, a]) => `<tr><td>${esc(k)}</td><td class="mono">${a.values.map(v => `${esc(v.code)}: ${v.effective === null || v.effective === undefined ? '—' : esc(Math.round(v.effective * 1000) / 1000)}`).join('<br>')}</td>
+      <td class="mono">${esc(a.limit)}</td><td class="mono">${a.uRelPct === null || a.uRelPct === undefined ? '—' : esc(a.uRelPct)}</td><td>${verdictChip(a.verdict)}${a.issues.length ? `<div class="section-hint">${L('ltIssues')}: ${a.issues.map(issueLabel).join('; ')}</div>` : ''}</td></tr>`).join('');
+    return `<div class="table-scroll"><table class="contaminants"><thead><tr><th>${L('ltAnalyte')}</th><th>${L('ltValues')}</th><th>${L('ltLimit')}</th><th>${L('ltU')}</th><th>${L('ltVerdict')}</th></tr></thead><tbody>${rows || `<tr><td colspan="5">${L('ltNoVerdict')}</td></tr>`}</tbody></table></div>
+      <div class="section-hint">${e.members.map(m => esc(m.code) + (m.bulletinNo ? ` (${esc(m.bulletinNo)})` : '')).join(' · ')}</div>`;
+  }
+  function wireLots(done, fail) {
+    document.getElementById('btn-lt-create')?.addEventListener('click', async () => {
+      const ids = [...document.getElementById('lt-pick').selectedOptions].map(o => Number(o.value));
+      if (ids.length < 2) { showToast(L('ltPickMin').replace(/<[^>]+>/g, ' ')); return; }
+      try {
+        await api('/lots', { method: 'POST', body: JSON.stringify({ lotMode: document.getElementById('lt-mode').value, sampleIds: ids, note: document.getElementById('lt-note').value }) });
+        await done(t('lab.ltCreated'));
+      } catch (e) { fail(e); }
+    });
+    document.querySelectorAll('.btn-lt-detail').forEach(b => b.addEventListener('click', async () => {
+      const row = document.getElementById(`lt-detail-${b.dataset.id}`);
+      if (!row) return;
+      if (!row.hidden) { row.hidden = true; return; }
+      try { const e = await api(`/lots/${b.dataset.id}`); row.firstElementChild.innerHTML = lotDetailHtml(e); row.hidden = false; } catch (err) { fail(err); }
+    }));
+    document.querySelectorAll('.btn-lt-dissolve').forEach(b => b.addEventListener('click', async () => {
+      if (!window.confirm(t('lab.ltDissolveConfirm'))) return;
+      try { await api(`/lots/${b.dataset.id}`, { method: 'DELETE' }); await done(); } catch (e) { fail(e); }
+    }));
+  }
   function wireLabBody(eq) {
     const val = (id) => document.getElementById(id)?.value ?? '';
     const done = async (msg) => { showToast(msg || L('saved')); await refreshLabBody(); };
     const fail = (err) => showToast(String(err.message || err));
+    wireLots(done, fail);
     document.getElementById('btn-qc-add')?.addEventListener('click', async () => {
       try {
         const r = await api('/lab/qc-controls', { method: 'POST', body: JSON.stringify({ analyteGroup: val('qc-group'), reagentLotId: val('qc-lot') || null, measuredValue: val('qc-measured'), expectedValue: val('qc-expected'), acceptLowPct: val('qc-low'), acceptHighPct: val('qc-high'), notes: val('qc-notes') }) });

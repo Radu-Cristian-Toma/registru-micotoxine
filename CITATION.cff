@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "Dacă folosiți acest software, citați-l astfel / If you use this software, please cite it as below."
 title: "Registru Micotoxine"
 type: software
-version: "1.55.0"
-doi: 10.5281/zenodo.23778986
+version: "1.55.1"
+# doi: se adaugă după release (DOI-ul v1.55.0 este 10.5281/zenodo.23778986)
 date-released: "2026-10-29"
 license: AGPL-3.0-or-later
 repository-code: "https://github.com/Radu-Cristian-Toma/registru-micotoxine"

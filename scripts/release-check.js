@@ -38,6 +38,7 @@ const required = [
   'public/index.html',
   'public/app.js',
   'public/i18n.js',
+  'public/server-errors-en.js',
   'public/decision-core.js',
   'public/lab.js',
   'public/style.css',

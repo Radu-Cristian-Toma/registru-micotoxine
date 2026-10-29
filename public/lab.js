@@ -264,7 +264,7 @@
     document.getElementById('btn-export-json')?.addEventListener('click', async () => {
       try {
         const res = await fetch(`/api/results/${sample.id}/export`, { credentials: 'same-origin' });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
+        if (!res.ok) throw new Error(translateServerError((await res.json().catch(() => ({}))).error) || res.status);
         const blob = await res.blob();
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = `rezultat-${sample.bulletinNo || sample.code}.json`;
@@ -291,7 +291,7 @@
     document.getElementById('btn-dossier')?.addEventListener('click', async () => {
       try {
         const res = await fetch(`/api/lab/dossier/${sample.id}`, { credentials: 'same-origin' });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
+        if (!res.ok) throw new Error(translateServerError((await res.json().catch(() => ({}))).error) || res.status);
         const blob = await res.blob();
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = `dosar-${sample.code}.json`;

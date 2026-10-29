@@ -1,5 +1,9 @@
 # Registru Micotoxine — v1.55.0
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23778986.svg)](https://doi.org/10.5281/zenodo.23778986)
+
+**Cum se citează:** Toma R.C. (2026). *Registru Micotoxine*, v1.55.0 [software]. Zenodo. https://doi.org/10.5281/zenodo.23778986 (vezi `CITATION.cff`).
+
 LIMS pentru gestionarea probelor, rezultatelor și raportării controlate a analizelor de micotoxine, în dezvoltare activă către un pilot de laborator.
 
 ## Scop

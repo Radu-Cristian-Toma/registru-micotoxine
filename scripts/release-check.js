@@ -46,6 +46,7 @@ const required = [
   '.env.example',
   'LICENSE',
   'NOTICE',
+  'CITATION.cff',
   'SECURITY.md',
   'Dockerfile',
   'docker-compose.yml',
